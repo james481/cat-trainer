@@ -9,6 +9,9 @@
 #include <Wire.h>
 #include "nRF24L01.h"
 #include "RF24.h"
+#include <avr/sleep.h>
+#include <avr/power.h>
+#include <avr/wdt.h>
 
 /*
  * Configuration
@@ -16,6 +19,8 @@
 #define DEBUG 1
 #define FEATHER32U4 0
 #define RADIO_CHANNEL 76
+#define STATUS_FLASH_DELAY 4
+#define STATUS_FLASH_PERIOD 200
 
 /*
  * GPIO Connections
@@ -64,6 +69,12 @@ const uint64_t pipes[2] = { 0xF0F0F0F0F1LL, 0xF0F0F0F0D2LL };
 uint8_t sensorId = 0;
 
 /*
+ * Interrupt Registers
+ */
+volatile uint8_t sensorInterrupt = 0;
+volatile uint8_t watchdogCount = 0;
+
+/*
  * Setup / Initialize
  */
 void setup(void) {
@@ -84,7 +95,9 @@ void loop(void) {
 
   // Go to sleep and wait for an interrupt from the
   // accelerometer.
-
+  if (sensorInterrupt > 0) {
+    // Send sensor trigger packet
+  }
 }
 
 /*
@@ -126,6 +139,9 @@ void setupSensor(void) {
 #if DEBUG == 1
   Serial.print(F("Initializing MMA8452 Sensor:"));
 #endif
+  // TODO Multiple sensor setup
+  uint8_t address = ADDR;
+
 
 #if DEBUG == 1
   Serial.println(F(" Complete."));
@@ -133,10 +149,41 @@ void setupSensor(void) {
 }
 
 /*
+ * Write a value to a MMA8452 register.
+ */
+void writeRegister(uint8_t address, byte reg, byte val) {
+  Wire.beginTransmission(address);
+  Wire.write(reg);
+  Wire.write(val);
+  Wire.endTransmission();
+}
+
+/*
+ * Read a value from a MMA8452 register.
+ */
+byte readRegister(uint8_t address, byte reg) {
+  Wire.beginTransmission(address);
+  Wire.write(reg);
+  Wire.endTransmission(false);
+  Wire.requestFrom(address, (byte) 1);
+
+  while(!Wire.available()) ;
+  return(Wire.read());
+}
+
+/*
  * Sync the sensor to the base / host and get a sensor id.
  */
 uint8_t syncSensor(void) {
   return(1);
+}
+
+/*
+ * Watchdog Interrupt - Wakeup every 8 seconds and increment the watchdog
+ * counter.
+ */
+ISR(WDT_vect) {
+  watchdogCount++;
 }
 
 // vim:cin:ai:sts=2 sw=2 ft=cpp
