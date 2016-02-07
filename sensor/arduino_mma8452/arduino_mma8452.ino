@@ -84,6 +84,11 @@ volatile bool statusLedActive = false;
  */
 void setup(void) {
   Serial.begin(115200);
+
+#if DEBUG
+  Serial.println(F(""));
+#endif
+
   setupRadio();
   setupSensor();
 
@@ -101,10 +106,12 @@ void setup(void) {
   WDTCSR |= (1<<WDCE) | (1<<WDE);
   WDTCSR = (1<<WDIE) | (0<<WDE) | (1<<WDP3) | (0<<WDP2) | (0<<WDP1) | (1<<WDP0);
 
-  // Setup Timer1 to turn off status LED via interrupt.
-  TCCR1A = 0;
-  TCCR1B = 0;
-  TCCR1B |= (1 << CS12);    // 256 prescaler
+  // Setup Timer2 to turn off status LED via interrupt.
+  TCCR2A = 0;
+  TCCR2B = 0;
+
+  TCCR2B |= (1 << CS12);    // 256 prescaler
+  TIMSK2 |= (1 << TOIE1);   // enable timer overflow interrupt
 
   // Enable Interrupts.
   sei();
@@ -122,13 +129,13 @@ void loop(void) {
 
   // Turn off the status LED if it's on.
   if (statusLedActive) {
+#if DEBUG
+  Serial.println(F("Status LED Disable."));
+#endif
     analogWrite(GPIO_LED_R, 255);
     analogWrite(GPIO_LED_G, 255);
     analogWrite(GPIO_LED_B, 255);
     statusLedActive = false;
-
-    // Disable Timer1 interrupt.
-    TIMSK1 |= (0 << TOIE1);
   }
 
   // Sync to base host and get a sensor id.
@@ -170,17 +177,12 @@ void enableStatusLed(void) {
   analogWrite(GPIO_LED_G, 100);
   analogWrite(GPIO_LED_B, 100);
   statusLedActive = true;
-
-  // Preload Timer and enable interrupt.
-  TCNT1 = STATUS_FLASH_PERIOD;
-  TIMSK1 |= (1 << TOIE1);
 }
 
 /*
  * Enter sleep mode and wait for the next interrupt.
  */
 void enterSleep(void) {
-
   // We need Timer1 active to turn off the LED.
   if (statusLedActive) {
     set_sleep_mode(SLEEP_MODE_PWR_SAVE);
@@ -346,9 +348,10 @@ ISR(WDT_vect) {
 }
 
 /*
- * Timer1 Interrupt - Wakeup a short time after the status led has turned on
+ * Timer2 Interrupt - Wakeup a short time after the status led has turned on
  * and turn it off again.
  */
-EMPTY_INTERRUPT(TIMER1_OVF_vect);
+ISR(TIMER2_OVF_vect) {
+}
 
 // vim:cin:ai:sts=2 sw=2 ft=cpp
