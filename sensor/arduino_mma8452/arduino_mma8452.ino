@@ -18,13 +18,12 @@
  */
 #define DEBUG true
 #define FEATHER32U4 false
+#define BAT_VCC_HIGH 4.0
+#define BAT_VCC_MED 3.5
 #define RADIO_CHANNEL 76
 
 // Status LED interval - Watchdog 8 sec cycle count
 #define STATUS_FLASH_DELAY 4
-
-// Status LED flash length - Timer1 preload 65536-8MHz/256/2Hz
-#define STATUS_FLASH_PERIOD 49911
 
 /*
  * GPIO Connections
@@ -36,6 +35,7 @@
 #define GPIO_LED_R 5
 #define GPIO_LED_G 6
 #define GPIO_LED_B 9
+#define FEATHER32U4_BATTERY_PIN A9
 
 /*
  * MMA8452 Registers
@@ -132,9 +132,7 @@ void loop(void) {
 #if DEBUG
   Serial.println(F("Status LED Disable."));
 #endif
-    analogWrite(GPIO_LED_R, 255);
-    analogWrite(GPIO_LED_G, 255);
-    analogWrite(GPIO_LED_B, 255);
+    setLedColor(0,0,0);
     statusLedActive = false;
   }
 
@@ -173,9 +171,29 @@ void enableStatusLed(void) {
   Serial.println(F("Status LED Enable."));
 #endif
 
-  analogWrite(GPIO_LED_R, 100);
-  analogWrite(GPIO_LED_G, 100);
-  analogWrite(GPIO_LED_B, 100);
+#if FEATHER32U4
+  float measuredvbat = analogRead(FEATHER32U4_BATTERY_PIN);
+  measuredvbat *= 2;    // we divided by 2, so multiply back
+  measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
+  measuredvbat /= 1024; // convert to voltage
+
+#if DEBUG
+  Serial.print(F("Battery Voltage: "));
+  Serial.println(measuredvbat);
+#endif
+
+  if (measuredvbat > BAT_VCC_HIGH) {
+    setLedColor(0, 255, 0);
+  } else if (measuredvbat > BAT_VCC_MED) {
+    setLedColor(255, 255, 66);
+  } else {
+    setLedColor(255, 0, 0);
+  }
+
+#else
+  setLedColor(255, 255, 255);
+#endif
+
   statusLedActive = true;
 }
 
@@ -320,6 +338,17 @@ void sendSensorTrigger(void) {
 #if DEBUG
   Serial.println(F("Sensor triggered, sending."));
 #endif
+  setLedColor(255, 0, 0);
+  statusLedActive = true;
+}
+
+/*
+ * Convenience method to set the LED to a RGB color (or off).
+ */
+void setLedColor(uint8_t red, uint8_t green, uint8_t blue) {
+  analogWrite(GPIO_LED_R, 255 - red);
+  analogWrite(GPIO_LED_G, 255 - green);
+  analogWrite(GPIO_LED_B, 255 - blue);
 }
 
 /*
