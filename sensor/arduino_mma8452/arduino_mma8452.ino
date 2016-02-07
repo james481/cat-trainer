@@ -12,6 +12,7 @@
 #include <avr/sleep.h>
 #include <avr/power.h>
 #include <avr/wdt.h>
+#include "printf.h"
 
 /*
  * Configuration
@@ -86,6 +87,7 @@ void setup(void) {
   Serial.begin(115200);
 
 #if DEBUG
+  printf_begin();
   Serial.println(F(""));
 #endif
 
@@ -96,6 +98,8 @@ void setup(void) {
   pinMode(GPIO_LED_R, OUTPUT);
   pinMode(GPIO_LED_G, OUTPUT);
   pinMode(GPIO_LED_B, OUTPUT);
+
+  setLedColor(0,0,0);
 
   delay(250);
 
@@ -110,8 +114,11 @@ void setup(void) {
   TCCR2A = 0;
   TCCR2B = 0;
 
-  TCCR2B |= (1 << CS12);    // 256 prescaler
-  TIMSK2 |= (1 << TOIE1);   // enable timer overflow interrupt
+  // 256 prescaler
+  TCCR2B |= (1 << CS12);
+  //
+  // enable timer overflow interrupt
+  TIMSK2 |= (1 << TOIE1);
 
   // Enable Interrupts.
   sei();
@@ -166,7 +173,6 @@ void loop(void) {
  * Turn on the status LED with a color based on the battery status
  */
 void enableStatusLed(void) {
-  // TODO Flash color based on battery life
 #if DEBUG
   Serial.println(F("Status LED Enable."));
 #endif
@@ -225,7 +231,7 @@ void enterSleep(void) {
 void setupRadio(void) {
 
 #if DEBUG
-  Serial.print(F("Initializing NRF24L01+:"));
+  Serial.println(F("Initializing NRF24L01+:"));
 #endif
 
   radio.begin();
@@ -242,13 +248,13 @@ void setupRadio(void) {
   radio.openWritingPipe(pipes[0]);
   radio.openReadingPipe(1,pipes[1]);
 
-  // Power Down until something happens.
-  radio.powerDown();
-
 #if DEBUG
   radio.printDetails();
-  Serial.println(F(" Complete."));
+  delay(1000);
 #endif
+
+  // Power Down until something happens.
+  radio.powerDown();
 }
 
 /*
@@ -267,7 +273,7 @@ void setupSensor(void) {
   if (who_am_i != 0x2A) {
 
 #if DEBUG
-    Serial.print(F("ERROR: Unable to connect to MMA8452."));
+    Serial.println(F(" ERROR: Unable to connect to MMA8452."));
 #endif
     return;
   }
@@ -335,11 +341,31 @@ byte readRegister(uint8_t address, byte reg) {
  * Send a packet to the base indicating the sensor has fired.
  */
 void sendSensorTrigger(void) {
+  char sendBuf[3] = "";
+  sendBuf[0] = sensorId;
+  sendBuf[1] = sensorInterrupt;
+
 #if DEBUG
   Serial.println(F("Sensor triggered, sending."));
 #endif
   setLedColor(255, 0, 0);
   statusLedActive = true;
+
+  radio.powerUp();
+  if (radio.write(sendBuf, strlen(sendBuf))) {
+#if DEBUG
+    Serial.println(F("Sensor ID sent."));
+#endif
+  } else {
+#if DEBUG
+    Serial.println(F("ERROR: Radio send failure."));
+#endif
+  }
+
+  // Wait a bit before flashing the status LED.
+  if (watchdogCount) {
+    watchdogCount--;
+  }
 }
 
 /*
