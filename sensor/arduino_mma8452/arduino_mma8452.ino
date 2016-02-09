@@ -22,6 +22,7 @@
 #define BAT_VCC_HIGH 4.0
 #define BAT_VCC_MED 3.5
 #define RADIO_CHANNEL 76
+#define RADIO_TIMEOUT 250
 
 // Status LED interval - Watchdog 8 sec cycle count
 #define STATUS_FLASH_DELAY 4
@@ -79,6 +80,14 @@ uint8_t sensorId = 0;
 volatile uint8_t sensorInterrupt = 0;
 volatile uint8_t watchdogCount = 0;
 volatile bool statusLedActive = false;
+
+/*
+ * Data Packet
+ */
+struct sensorData {
+  uint8_t id;
+  uint8_t count;
+} myData;
 
 /*
  * Setup / Initialize
@@ -240,7 +249,7 @@ void setupRadio(void) {
   radio.setAutoAck(1);
 
   radio.setDataRate(RF24_1MBPS);
-  radio.setPALevel(RF24_PA_MAX);
+  radio.setPALevel(RF24_PA_LOW);
   radio.setChannel(RADIO_CHANNEL);
   radio.setCRCLength(RF24_CRC_16);
   radio.setRetries(15,15);
@@ -341,31 +350,68 @@ byte readRegister(uint8_t address, byte reg) {
  * Send a packet to the base indicating the sensor has fired.
  */
 void sendSensorTrigger(void) {
-  char sendBuf[3] = "";
-  sendBuf[0] = sensorId;
-  sendBuf[1] = sensorInterrupt;
+  unsigned long started = millis();
+  bool timeout = false;
+
+  myData.id = sensorId;
+  myData.count = sensorInterrupt;
 
 #if DEBUG
   Serial.println(F("Sensor triggered, sending."));
 #endif
+
   setLedColor(255, 0, 0);
   statusLedActive = true;
 
   radio.powerUp();
-  if (radio.write(sendBuf, strlen(sendBuf))) {
+
+  if (!radio.write(&myData, sizeof(myData))) {
+    setLedColor(255, 255, 66);
+
 #if DEBUG
-    Serial.println(F("Sensor ID sent."));
+    Serial.println(F("Send failed."));
 #endif
-  } else {
-#if DEBUG
-    Serial.println(F("ERROR: Radio send failure."));
-#endif
+
   }
+
+  // Listen for a reply or until we timeout.
+  radio.startListening();
+
+  while (!radio.available() && !timeout) {
+    if ((millis() - started) > RADIO_TIMEOUT) {
+      timeout = true;
+    }
+  }
+
+  if (timeout) {
+    // Flash yellow
+    setLedColor(255, 255, 66);
+
+#if DEBUG
+    Serial.println(F("Radio Timeout."));
+#endif
+
+  } else {
+    uint8_t len = radio.getDynamicPayloadSize();
+    if (len) {
+      radio.read(&myData, len);
+    }
+
+#if DEBUG
+    Serial.println("Radio got response.");
+#endif
+
+  }
+
+  radio.stopListening();
 
   // Wait a bit before flashing the status LED.
   if (watchdogCount) {
     watchdogCount--;
   }
+
+  // Power the radio back down.
+  radio.powerDown();
 }
 
 /*
