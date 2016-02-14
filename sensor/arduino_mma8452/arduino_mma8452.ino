@@ -5,13 +5,14 @@
  * an Arduino compatible host.
  */
 
-#include <SPI.h>
-#include <Wire.h>
-#include "nRF24L01.h"
-#include "RF24.h"
 #include <avr/sleep.h>
 #include <avr/power.h>
 #include <avr/wdt.h>
+#include <SPI.h>
+#include <Wire.h>
+#include <EEPROM.h>
+#include "nRF24L01.h"
+#include "RF24.h"
 #include "printf.h"
 
 /*
@@ -71,7 +72,7 @@
 
 // NRF24L01+ Setup
 RF24 radio(GPIO_RF24_CE, GPIO_RF24_CSN);
-const uint64_t pipes[2] = { 0xF0F0F0F0F1LL, 0xF0F0F0F0D2LL };
+const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL };
 uint8_t sensorId = 0;
 
 /*
@@ -82,12 +83,32 @@ volatile uint8_t watchdogCount = 0;
 volatile bool statusLedActive = false;
 
 /*
- * Data Packet
+ * ID Storage (EEPROM)
+ */
+struct sensorUid {
+  uint8_t uid;
+  char stype[11];
+} myUid;
+
+/*
+ * Data Packets
  */
 struct sensorData {
-  uint8_t id;
+  sensorUid id;
+  const uint8_t ptype = 1;
   uint8_t count;
 } myData;
+
+struct syncData {
+  sensorUid id;
+  const uint8_t ptype = 0;
+} mySyncData;
+
+struct syncRes {
+  sensorUid id;
+  uint8_t ptype;
+  uint16_t spipe;
+} mySyncRes;
 
 /*
  * Setup / Initialize
@@ -100,6 +121,7 @@ void setup(void) {
   Serial.println(F(""));
 #endif
 
+  setupUid();
   setupRadio();
   setupSensor();
 
@@ -125,13 +147,14 @@ void setup(void) {
 
   // 256 prescaler
   TCCR2B |= (1 << CS12);
-  //
+
   // enable timer overflow interrupt
   TIMSK2 |= (1 << TOIE1);
 
   // Enable Interrupts.
   sei();
 
+  Serial.println(F("Sensor Ready."));
   delay(250);
 }
 
@@ -139,15 +162,8 @@ void setup(void) {
  * Main Loop
  */
 void loop(void) {
-#if DEBUG
-  Serial.println(F("Running Main Loop."));
-#endif
-
   // Turn off the status LED if it's on.
   if (statusLedActive) {
-#if DEBUG
-  Serial.println(F("Status LED Disable."));
-#endif
     setLedColor(0,0,0);
     statusLedActive = false;
   }
@@ -353,7 +369,7 @@ void sendSensorTrigger(void) {
   unsigned long started = millis();
   bool timeout = false;
 
-  myData.id = sensorId;
+  myData.id = myUid;
   myData.count = sensorInterrupt;
 
 #if DEBUG
@@ -418,6 +434,11 @@ void sendSensorTrigger(void) {
  * Convenience method to set the LED to a RGB color (or off).
  */
 void setLedColor(uint8_t red, uint8_t green, uint8_t blue) {
+
+#if DEBUG
+  printf_P(PSTR("LED RGB: %d %d %d\r\n"), red, green, blue);
+#endif
+
   analogWrite(GPIO_LED_R, 255 - red);
   analogWrite(GPIO_LED_G, 255 - green);
   analogWrite(GPIO_LED_B, 255 - blue);
@@ -431,6 +452,20 @@ uint8_t syncSensor(void) {
   Serial.println(F("Syncing sensor ID."));
 #endif
   return(1);
+}
+
+/*
+ * Setup the Sensor UID data structure from EEPROM.
+ */
+void setupUid(void) {
+#if DEBUG
+  Serial.print(F("Setting up debug sensor UID: "));
+  myUid.uid = 255;
+  strncpy(myUid.stype, "MMA8452DBG", sizeof(myUid.stype));
+  printf_P(PSTR("%d Type: %s\r\n"), myUid.uid, myUid.stype);
+#else
+  EEPROM.get(0, myUid);
+#endif
 }
 
 /*
