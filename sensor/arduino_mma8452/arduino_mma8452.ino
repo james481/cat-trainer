@@ -19,7 +19,7 @@
  * Configuration
  */
 #define DEBUG true
-#define FEATHER32U4 false
+// #define FEATHER32U4 true
 #define BAT_VCC_HIGH 4.0
 #define BAT_VCC_MED 3.5
 #define RADIO_CHANNEL 76
@@ -31,6 +31,8 @@
 /*
  * GPIO Connections
  */
+#ifndef FEATHER32U4
+
 #define GPIO_RF24_CE 7
 #define GPIO_RF24_CSN 8
 #define GPIO_MMA_IRQ1 2
@@ -38,7 +40,19 @@
 #define GPIO_LED_R 5
 #define GPIO_LED_G 6
 #define GPIO_LED_B 9
+
+#else
+
+#define GPIO_RF24_CE 5
+#define GPIO_RF24_CSN 6
+#define GPIO_MMA_IRQ1 0
+#define GPIO_MMA_IRQ2 1
+#define GPIO_LED_R 9
+#define GPIO_LED_G 10
+#define GPIO_LED_B 11
 #define FEATHER32U4_BATTERY_PIN A9
+
+#endif
 
 /*
  * MMA8452 Registers
@@ -67,12 +81,21 @@
 #define CTRL_REG5 0x2E
 
 /*
+ * Radio Packet IDs
+ */
+#define PTYPE_SYNCDATA 4
+#define PTYPE_SENSORDATA 1
+#define PTYPE_SYNCRES 2
+#define PTYPE_STATUS 3
+
+/*
  * Hardware Config
  */
 
 // NRF24L01+ Setup
 RF24 radio(GPIO_RF24_CE, GPIO_RF24_CSN);
-const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL };
+const uint64_t control_pipes[2] = { 0xA0A0A0A0E1LL, 0xF0F0F0F0A1LL };
+const uint64_t sensor_pipe_mask = 0xF0F0F0F000LL;
 uint8_t sensorId = 0;
 
 /*
@@ -86,8 +109,8 @@ volatile bool statusLedActive = false;
  * ID Storage (EEPROM)
  */
 struct sensorUid {
-  uint8_t uid;
   char stype[11];
+  uint8_t uid;
 } myUid;
 
 /*
@@ -95,20 +118,26 @@ struct sensorUid {
  */
 struct sensorData {
   sensorUid id;
-  const uint8_t ptype = 1;
+  const uint8_t ptype = PTYPE_SENSORDATA;
   uint8_t count;
 } myData;
 
 struct syncData {
   sensorUid id;
-  const uint8_t ptype = 0;
+  const uint8_t ptype = PTYPE_SYNCDATA;
 } mySyncData;
 
 struct syncRes {
   sensorUid id;
   uint8_t ptype;
-  uint16_t spipe;
+  uint8_t spipe;
 } mySyncRes;
+
+struct statusData {
+  sensorUid id;
+  const uint8_t ptype = PTYPE_STATUS;
+  float batlevel;
+} myStatusData;
 
 /*
  * Setup / Initialize
@@ -170,19 +199,25 @@ void loop(void) {
 
   // Sync to base host and get a sensor id.
   if (sensorId == 0) {
-    sensorId = syncSensor();
+    syncSensor();
   }
 
-  if (sensorInterrupt > 0) {
-    // Send sensor trigger packet
-    sendSensorTrigger();
-    sensorInterrupt = 0;
-  }
+  if (sensorId != 0) {
 
-  // Flash the status LED after a certain number of watchdog cycles.
-  if (watchdogCount >= STATUS_FLASH_DELAY) {
-    enableStatusLed();
-    watchdogCount = 0;
+    if (sensorInterrupt > 0) {
+      // Send sensor trigger packet
+      sendSensorTrigger();
+      sensorInterrupt = 0;
+    }
+
+    // Flash the status LED after a certain number of watchdog cycles.
+    if (watchdogCount >= STATUS_FLASH_DELAY) {
+      sendSensorStatus();
+      enableStatusLed();
+      watchdogCount = 0;
+    }
+  } else {
+    delay(1000);
   }
 
 #if DEBUG
@@ -202,16 +237,8 @@ void enableStatusLed(void) {
   Serial.println(F("Status LED Enable."));
 #endif
 
-#if FEATHER32U4
-  float measuredvbat = analogRead(FEATHER32U4_BATTERY_PIN);
-  measuredvbat *= 2;    // we divided by 2, so multiply back
-  measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
-  measuredvbat /= 1024; // convert to voltage
-
-#if DEBUG
-  Serial.print(F("Battery Voltage: "));
-  Serial.println(measuredvbat);
-#endif
+#ifdef FEATHER32U4
+  float measuredvbat = getBatteryVoltage();
 
   if (measuredvbat > BAT_VCC_HIGH) {
     setLedColor(0, 255, 0);
@@ -251,6 +278,29 @@ void enterSleep(void) {
 }
 
 /*
+ * Get the current battery voltage (or 3.3 if debug)
+ */
+float getBatteryVoltage(void) {
+
+#ifdef FEATHER32U4
+  float measuredvbat = analogRead(FEATHER32U4_BATTERY_PIN);
+  measuredvbat *= 2;    // we divided by 2, so multiply back
+  measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
+  measuredvbat /= 1024; // convert to voltage
+
+#if DEBUG
+  Serial.print(F("Battery Voltage: "));
+  Serial.println(measuredvbat);
+#endif
+
+#else
+  float measuredvbat = 3.3;
+#endif
+
+  return(measuredvbat);
+}
+
+/*
  * Setup NRF24L01+ chip.
  */
 void setupRadio(void) {
@@ -270,8 +320,8 @@ void setupRadio(void) {
   radio.setCRCLength(RF24_CRC_16);
   radio.setRetries(15,15);
 
-  radio.openWritingPipe(pipes[0]);
-  radio.openReadingPipe(1,pipes[1]);
+  radio.openWritingPipe(control_pipes[1]);
+  radio.openReadingPipe(1,control_pipes[0]);
 
 #if DEBUG
   radio.printDetails();
@@ -363,6 +413,63 @@ byte readRegister(uint8_t address, byte reg) {
 }
 
 /*
+ * Send a status / heartbeat packet to the base.
+ */
+void sendSensorStatus(void) {
+  unsigned long started = millis();
+  bool timeout = false;
+
+  myStatusData.id = myUid;
+  myStatusData.batlevel = getBatteryVoltage();
+
+#if DEBUG
+  Serial.println(F("Sensor status sending."));
+#endif
+
+  radio.powerUp();
+
+  if (!radio.write(&myStatusData, sizeof(myStatusData))) {
+
+#if DEBUG
+    Serial.println(F("Send status failed."));
+#endif
+
+  }
+
+  // Listen for a reply or until we timeout.
+  radio.startListening();
+
+  while (!radio.available() && !timeout) {
+    if ((millis() - started) > RADIO_TIMEOUT) {
+      timeout = true;
+    }
+  }
+
+  if (timeout) {
+
+#if DEBUG
+    Serial.println(F("Radio status timeout."));
+#endif
+
+  } else {
+    uint8_t len = radio.getDynamicPayloadSize();
+    if (len) {
+      radio.read(&myStatusData, len);
+    }
+
+#if DEBUG
+    Serial.println("Radio got response.");
+#endif
+
+  }
+
+  radio.stopListening();
+
+  // Power the radio back down.
+  radio.powerDown();
+}
+
+/*
  * Send a packet to the base indicating the sensor has fired.
  */
 void sendSensorTrigger(void) {
@@ -447,11 +554,81 @@ void setLedColor(uint8_t red, uint8_t green, uint8_t blue) {
 /*
  * Sync the sensor to the base / host and get a sensor id.
  */
-uint8_t syncSensor(void) {
+void syncSensor(void) {
 #if DEBUG
   Serial.println(F("Syncing sensor ID."));
 #endif
-  return(1);
+
+  unsigned long started = millis();
+  bool timeout = false;
+
+  mySyncData.id = myUid;
+
+  setLedColor(0, 0, 255);
+  statusLedActive = true;
+
+  radio.powerUp();
+
+#if DEBUG
+    printf_P(PSTR("Send sync data %s %d %d\r\n"), myUid.stype, myUid.uid, mySyncData.ptype);
+#endif
+
+  if (!radio.write(&mySyncData, sizeof(mySyncData))) {
+    setLedColor(255, 0, 0);
+
+#if DEBUG
+    Serial.println(F("Sync send failed."));
+#endif
+
+  }
+
+  // Listen for a reply or until we timeout.
+  radio.startListening();
+
+  while (!radio.available() && !timeout) {
+    if ((millis() - started) > RADIO_TIMEOUT) {
+      timeout = true;
+    }
+  }
+
+  if (timeout) {
+    // Flash red
+    setLedColor(255, 0, 0);
+
+#if DEBUG
+    Serial.println(F("Sync Radio Timeout."));
+#endif
+
+  } else {
+    uint8_t len = radio.getDynamicPayloadSize();
+
+#if DEBUG
+    printf_P(PSTR("Received length %d, expecting %d\r\n"), len, sizeof(mySyncRes));
+#endif
+
+    if (len && (len == sizeof(mySyncRes))) {
+      radio.read(&mySyncRes, len);
+
+      if ((mySyncRes.ptype == PTYPE_SYNCRES) && mySyncRes.spipe) {
+        sensorId = mySyncRes.spipe;
+      }
+    }
+
+#if DEBUG
+    printf_P(PSTR("Sync Request got response: %d %02x len: %d\r\n"), mySyncRes.ptype, mySyncRes.spipe, len);
+#endif
+
+  }
+
+  radio.stopListening();
+
+  // Open new writing pipe
+  if (sensorId) {
+    radio.openWritingPipe(sensor_pipe_mask | sensorId);
+  }
+
+  // Power the radio back down.
+  radio.powerDown();
 }
 
 /*
