@@ -83,10 +83,10 @@
 /*
  * Radio Packet IDs
  */
-#define PTYPE_SYNCDATA 4
-#define PTYPE_SENSORDATA 1
+#define PTYPE_SYNCDATA 1
 #define PTYPE_SYNCRES 2
-#define PTYPE_STATUS 3
+#define PTYPE_SENSORDATA 3
+#define PTYPE_STATUS 4
 
 /*
  * Hardware Config
@@ -116,28 +116,12 @@ struct sensorUid {
 /*
  * Data Packets
  */
-struct sensorData {
-  sensorUid id;
-  const uint8_t ptype = PTYPE_SENSORDATA;
-  uint8_t count;
-} myData;
-
-struct syncData {
-  sensorUid id;
-  const uint8_t ptype = PTYPE_SYNCDATA;
-} mySyncData;
-
-struct syncRes {
+struct dataPacket {
   sensorUid id;
   uint8_t ptype;
   uint8_t spipe;
-} mySyncRes;
-
-struct statusData {
-  sensorUid id;
-  const uint8_t ptype = PTYPE_STATUS;
   float batlevel;
-} myStatusData;
+} sendPacket, recPacket;
 
 /*
  * Setup / Initialize
@@ -200,6 +184,9 @@ void loop(void) {
   // Sync to base host and get a sensor id.
   if (sensorId == 0) {
     syncSensor();
+
+    // Ignore any sensor events while we're syncing
+    sensorInterrupt = 0;
   }
 
   if (sensorId != 0) {
@@ -217,6 +204,8 @@ void loop(void) {
       watchdogCount = 0;
     }
   } else {
+    // Delay for a while before attempting another sync, this is fine
+    // to be blocking (events won't be handled until synced).
     delay(1000);
   }
 
@@ -419,8 +408,10 @@ void sendSensorStatus(void) {
   unsigned long started = millis();
   bool timeout = false;
 
-  myStatusData.id = myUid;
-  myStatusData.batlevel = getBatteryVoltage();
+  sendPacket.id = myUid;
+  sendPacket.spipe = 0;
+  sendPacket.ptype = PTYPE_STATUS;
+  sendPacket.batlevel = getBatteryVoltage();
 
 #if DEBUG
   Serial.println(F("Sensor status sending."));
@@ -428,7 +419,7 @@ void sendSensorStatus(void) {
 
   radio.powerUp();
 
-  if (!radio.write(&myStatusData, sizeof(myStatusData))) {
+  if (!radio.write(&sendPacket, sizeof(sendPacket))) {
 
 #if DEBUG
     Serial.println(F("Send status failed."));
@@ -453,12 +444,17 @@ void sendSensorStatus(void) {
 
   } else {
     uint8_t len = radio.getDynamicPayloadSize();
-    if (len) {
-      radio.read(&myStatusData, len);
+
+#if DEBUG
+    printf_P(PSTR("Received status length %d, expecting %d\r\n"), len, sizeof(recPacket));
+#endif
+
+    if (len && (len == sizeof(recPacket))) {
+      radio.read(&recPacket, len);
     }
 
 #if DEBUG
-    Serial.println("Radio got response.");
+    printf_P(PSTR("Radio status got response: %d %02x len: %d\r\n"), recPacket.ptype, recPacket.spipe, len);
 #endif
 
   }
@@ -476,8 +472,10 @@ void sendSensorTrigger(void) {
   unsigned long started = millis();
   bool timeout = false;
 
-  myData.id = myUid;
-  myData.count = sensorInterrupt;
+  sendPacket.id = myUid;
+  sendPacket.spipe = sensorInterrupt;
+  sendPacket.ptype = PTYPE_SENSORDATA;
+  sendPacket.batlevel = getBatteryVoltage();
 
 #if DEBUG
   Serial.println(F("Sensor triggered, sending."));
@@ -488,7 +486,7 @@ void sendSensorTrigger(void) {
 
   radio.powerUp();
 
-  if (!radio.write(&myData, sizeof(myData))) {
+  if (!radio.write(&sendPacket, sizeof(sendPacket))) {
     setLedColor(255, 255, 66);
 
 #if DEBUG
@@ -516,12 +514,17 @@ void sendSensorTrigger(void) {
 
   } else {
     uint8_t len = radio.getDynamicPayloadSize();
-    if (len) {
-      radio.read(&myData, len);
+
+#if DEBUG
+    printf_P(PSTR("Received length %d, expecting %d\r\n"), len, sizeof(recPacket));
+#endif
+
+    if (len && (len == sizeof(recPacket))) {
+      radio.read(&recPacket, len);
     }
 
 #if DEBUG
-    Serial.println("Radio got response.");
+    printf_P(PSTR("Radio got response: %d %02x len: %d\r\n"), recPacket.ptype, recPacket.spipe, len);
 #endif
 
   }
@@ -562,7 +565,10 @@ void syncSensor(void) {
   unsigned long started = millis();
   bool timeout = false;
 
-  mySyncData.id = myUid;
+  sendPacket.id = myUid;
+  sendPacket.spipe = 0;
+  sendPacket.ptype = PTYPE_SYNCDATA;
+  sendPacket.batlevel = getBatteryVoltage();
 
   setLedColor(0, 0, 255);
   statusLedActive = true;
@@ -570,10 +576,10 @@ void syncSensor(void) {
   radio.powerUp();
 
 #if DEBUG
-    printf_P(PSTR("Send sync data %s %d %d\r\n"), myUid.stype, myUid.uid, mySyncData.ptype);
+    printf_P(PSTR("Send sync data %s %d %d\r\n"), myUid.stype, myUid.uid, sendPacket.ptype);
 #endif
 
-  if (!radio.write(&mySyncData, sizeof(mySyncData))) {
+  if (!radio.write(&sendPacket, sizeof(sendPacket))) {
     setLedColor(255, 0, 0);
 
 #if DEBUG
@@ -603,19 +609,19 @@ void syncSensor(void) {
     uint8_t len = radio.getDynamicPayloadSize();
 
 #if DEBUG
-    printf_P(PSTR("Received length %d, expecting %d\r\n"), len, sizeof(mySyncRes));
+    printf_P(PSTR("Received length %d, expecting %d\r\n"), len, sizeof(recPacket));
 #endif
 
-    if (len && (len == sizeof(mySyncRes))) {
-      radio.read(&mySyncRes, len);
+    if (len && (len == sizeof(recPacket))) {
+      radio.read(&recPacket, len);
 
-      if ((mySyncRes.ptype == PTYPE_SYNCRES) && mySyncRes.spipe) {
-        sensorId = mySyncRes.spipe;
+      if ((recPacket.ptype == PTYPE_SYNCRES) && recPacket.spipe) {
+        sensorId = recPacket.spipe;
       }
     }
 
 #if DEBUG
-    printf_P(PSTR("Sync Request got response: %d %02x len: %d\r\n"), mySyncRes.ptype, mySyncRes.spipe, len);
+    printf_P(PSTR("Sync Request got response: %d %02x len: %d\r\n"), recPacket.ptype, recPacket.spipe, len);
 #endif
 
   }
