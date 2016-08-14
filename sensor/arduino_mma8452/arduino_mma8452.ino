@@ -19,7 +19,7 @@
  * Configuration
  */
 #define DEBUG true
-// #define FEATHER32U4 true
+#define FEATHER32U4 true
 #define BAT_VCC_HIGH 4.0
 #define BAT_VCC_MED 3.5
 #define RADIO_CHANNEL 76
@@ -33,6 +33,7 @@
  */
 #ifndef FEATHER32U4
 
+// Arduino Pro Mini, etc:
 #define GPIO_RF24_CE 7
 #define GPIO_RF24_CSN 8
 #define GPIO_MMA_IRQ1 2
@@ -43,10 +44,11 @@
 
 #else
 
+// Feather 32u4 (Production):
 #define GPIO_RF24_CE 5
 #define GPIO_RF24_CSN 6
-#define GPIO_MMA_IRQ1 0
-#define GPIO_MMA_IRQ2 1
+#define GPIO_MMA_IRQ1 2
+#define GPIO_MMA_IRQ2 3
 #define GPIO_LED_R 9
 #define GPIO_LED_G 10
 #define GPIO_LED_B 11
@@ -103,7 +105,8 @@ uint8_t sensorId = 0;
  */
 volatile uint8_t sensorInterrupt = 0;
 volatile uint8_t watchdogCount = 0;
-volatile bool statusLedActive = false;
+volatile bool statusLedDisable = false;
+bool statusLedActive = false;
 
 /*
  * ID Storage (EEPROM)
@@ -132,6 +135,7 @@ void setup(void) {
 #if DEBUG
   printf_begin();
   Serial.println(F(""));
+  delay(10000);
 #endif
 
   setupUid();
@@ -154,15 +158,15 @@ void setup(void) {
   WDTCSR |= (1<<WDCE) | (1<<WDE);
   WDTCSR = (1<<WDIE) | (0<<WDE) | (1<<WDP3) | (0<<WDP2) | (0<<WDP1) | (1<<WDP0);
 
-  // Setup Timer2 to turn off status LED via interrupt.
-  TCCR2A = 0;
-  TCCR2B = 0;
+  // Setup Timer1 to turn off status LED via interrupt.
+  TCCR1A = 0;
+  TCCR1B = 0;
 
-  // 256 prescaler
-  TCCR2B |= (1 << CS12);
+  // 8 prescaler
+  TCCR1B |= (1 << CS11);
 
   // enable timer overflow interrupt
-  TIMSK2 |= (1 << TOIE1);
+  TIMSK1 |= (1 << TOIE1);
 
   // Enable Interrupts.
   sei();
@@ -175,10 +179,11 @@ void setup(void) {
  * Main Loop
  */
 void loop(void) {
-  // Turn off the status LED if it's on.
-  if (statusLedActive) {
+  // Turn off status LED after Timer interrupt.
+  if (statusLedActive && statusLedDisable) {
     setLedColor(0,0,0);
     statusLedActive = false;
+    statusLedDisable = false;
   }
 
   // Sync to base host and get a sensor id.
@@ -250,7 +255,8 @@ void enableStatusLed(void) {
 void enterSleep(void) {
   // We need Timer1 active to turn off the LED.
   if (statusLedActive) {
-    set_sleep_mode(SLEEP_MODE_PWR_SAVE);
+    // set_sleep_mode(SLEEP_MODE_PWR_SAVE);
+    return;
   } else {
     set_sleep_mode(SLEEP_MODE_PWR_DOWN);
     power_all_disable();
@@ -371,7 +377,11 @@ void setupSensor(void) {
   writeRegister(address, CTRL_REG1, ready | 0x01);
 
   // Attach Interrupt
+#ifdef FEATHER32U4
+  attachInterrupt(intPin, sensorIsr, FALLING);
+#else
   attachInterrupt(digitalPinToInterrupt(intPin), sensorIsr, FALLING);
+#endif
 
 #if DEBUG
   Serial.println(F(" Complete."));
@@ -667,10 +677,11 @@ ISR(WDT_vect) {
 }
 
 /*
- * Timer2 Interrupt - Wakeup a short time after the status led has turned on
+ * Timer1 Interrupt - Wakeup a short time after the status led has turned on
  * and turn it off again.
  */
-ISR(TIMER2_OVF_vect) {
+ISR(TIMER1_OVF_vect) {
+  statusLedDisable = true;
 }
 
 // vim:cin:ai:sts=2 sw=2 ft=cpp
