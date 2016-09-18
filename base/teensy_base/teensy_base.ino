@@ -120,12 +120,6 @@ class MenuItem {
     }
 
     inline MenuItem *getChild() const {
-#if DEBUG
-      printf_P(
-        PSTR("getChild found child %d.\r\n"),
-        child->getUid()
-      );
-#endif
       return(child);
     }
 
@@ -144,6 +138,7 @@ class MenuItem {
     }
 
     MenuItem &setChild(MenuItem &item) {
+
 #if DEBUG
       printf_P(
         PSTR("Setting Menu item %s (%d) to child %s (%d).\r\n"),
@@ -153,16 +148,10 @@ class MenuItem {
         item.getUid()
       );
 #endif
+
       child = &item;
       item.parent = this;
 
-#if DEBUG
-      printf_P(
-        PSTR("Child now %s (%d).\r\n"),
-        child->getLabel(),
-        child->getUid()
-      );
-#endif
       return(item);
     }
 
@@ -180,6 +169,10 @@ class MenuItem {
 
     bool isEqual(MenuItem &item) {
       return(getUid() == item.getUid());
+    }
+
+    bool isEqual(MenuItem *item) {
+      return(getUid() == item->getUid());
     }
 
     void execute() {
@@ -203,12 +196,13 @@ class MenuItem {
 
 class MenuDisplay {
   public:
-    MenuDisplay(Adafruit_SSD1306 dis) : display(dis), root("root", 0) {
-      current = &root;
+    MenuDisplay(Adafruit_SSD1306 *dis, MenuItem *rootItem) : oled(dis), root(rootItem) {
+      current = root;
+      first = root;
     }
 
     MenuItem getRoot() {
-      return(root);
+      return(*root);
     }
 
     MenuItem getCurrent() {
@@ -223,12 +217,10 @@ class MenuDisplay {
       bool redraw = false;
 
 #if DEBUG
-      MenuItem *child = current->getChild();
       printf_P(
-        PSTR("handleButtons Called, current %s (%d) child (%d).\r\n"),
+        PSTR("handleButtons: Current %s (%d).\r\n"),
         current->getLabel(),
-        current->getUid(),
-        child->getUid()
+        current->getUid()
       );
 #endif
 
@@ -268,13 +260,6 @@ class MenuDisplay {
         }
       }
 
-#if DEBUG
-      printf_P(
-        PSTR("handleButtons Called, redraw %d.\r\n"),
-        redraw
-      );
-#endif
-
       if (redraw) {
         redrawMenu();
       }
@@ -283,12 +268,6 @@ class MenuDisplay {
     }
 
   private:
-    void setCurrent(MenuItem *newcur) {
-      if (newcur) {
-        current = newcur;
-      }
-    }
-
     void findFirst(MenuItem *newcur) {
       if (newcur) {
         if (newcur->getAbove()) {
@@ -300,6 +279,11 @@ class MenuDisplay {
     }
 
     void redrawMenu() {
+#if DEBUG
+      DEBUGOUT.println(F("Redrawing Menu Display."));
+#endif
+
+      Adafruit_SSD1306 display = *oled;
       display.clearDisplay();
       display.setTextSize(1);
       display.setCursor(0, 0);
@@ -316,15 +300,23 @@ class MenuDisplay {
         display.println(cur->getLabel());
         cur = cur->getBelow();
       }
+
+      display.display();
     }
 
-    Adafruit_SSD1306 display;
-    MenuItem root;
+    void setCurrent(MenuItem *newcur) {
+      if (newcur) {
+        current = newcur;
+      }
+    }
+
+    Adafruit_SSD1306 *oled;
+    MenuItem *root;
     MenuItem *current;
     MenuItem *first;
 };
 
-MenuDisplay menu(display);
+MenuItem mi_root("Main Menu", 1);
 
 MenuItem mi_sensors("Sensors", 10);
 MenuItem mi_sensor1("Sensor 1", 11);
@@ -334,6 +326,8 @@ MenuItem mi_sensor3("Sensor 3", 13);
 MenuItem mi_master("Master On / Off", 20);
 MenuItem mi_masteron("On", 21);
 MenuItem mi_masteroff("Off", 22);
+
+MenuDisplay menu(&display, &mi_root);
 
 void setupRadio(void);
 void setupDisplay(void);
@@ -470,21 +464,18 @@ void checkMenuDisplay(void) {
   }
 
   if (menuActive && btnState.pushed) {
-#if DEBUG
-    DEBUGOUT.println(F("Calling handleButtons."));
-#endif
-
     menuActive = menu.handleButtons(btnState);
 
 #if DEBUG
     MenuItem cur = menu.getCurrent();
     printf_P(
-      PSTR("handleButtons called (%d), current now %s (%d).\r\n"),
-      menuActive,
+      PSTR("checkMenuDisplay: Menu %s active, current now %s (%d).\r\n"),
+      (menuActive) ? "is" : "is not",
       cur.getLabel(),
       cur.getUid()
     );
 #endif
+
   }
 }
 
@@ -521,8 +512,6 @@ void setupMenu(void) {
   DEBUGOUT.println(F("Initializing Menu:"));
 #endif
 
-  MenuItem mi_root = menu.getRoot();
-
   mi_root.setChild(mi_sensors);
 
   mi_sensor1.addBelow(mi_sensor2);
@@ -536,13 +525,7 @@ void setupMenu(void) {
   mi_masteroff.setParent(mi_master);
   mi_master.setParent(mi_root);
 
-#if DEBUG
-    printf_P(
-      PSTR("mi_root child %s (%d).\r\n"),
-      mi_root.getChild()->getLabel(),
-      mi_root.getChild()->getUid()
-    );
-#endif
+  mi_sensors.addBelow(mi_master);
 }
 
 /*
