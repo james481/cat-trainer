@@ -30,8 +30,9 @@ struct sensorUid {
 
 struct sensor {
   sensorUid id;
-  uint8_t baseId;
-  uint8_t direction;
+  uint8_t baseId = 0;
+  uint8_t direction = 90;
+  uint8_t lastSeen = 0;
   float vbat;
 };
 
