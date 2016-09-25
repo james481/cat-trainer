@@ -22,9 +22,10 @@
  * Configuration
  */
 
+#define MENU_TIMEOUT 10000 // ms until menu exits
+#define SENSOR_MAX 3 // No More than 4
 #define DEBUG true
 #define DEBUGOUT Serial
-#define MENU_TIMEOUT 10000
 
 // NRF24L01
 #define GPIO_RF24_CE 14
@@ -38,6 +39,8 @@
 #define GPIO_BTN_HOLD_DELAY 750
 
 // Pump / Servo
+#define SERVO_MOVE_DELAY 500
+#define PUMP_SPRAY_LENGTH 1000
 #define GPIO_SPRAY_PUMP A6
 #define GPIO_SPRAY_SERVO A7
 
@@ -62,7 +65,7 @@ Bounce buttonDown(GPIO_BTN_DN, GPIO_DEBOUNCE);
 Bounce buttonUp(GPIO_BTN_UP, GPIO_DEBOUNCE);
 
 // Button States: 0 - None, 1 - Click, 2 - Hold
-struct buttonState {
+struct ButtonState {
   uint8_t enter = 0;
   uint8_t up = 0;
   uint8_t down = 0;
@@ -70,19 +73,28 @@ struct buttonState {
 } btnState;
 
 /*
- * Sensor ID Storage
+ * Sensor ID / Packet Storage
  */
-sensorUid remoteUid;
-sensor sensors[3];
+Sensor sensors[SENSOR_MAX];
+SensorUid remoteUid;
+DataPacket recvPacket, sendPacket;
+
+const uint8_t sensorBaseIds[4] = { 0xB1, 0xC2, 0xD3, 0xE4 };
 
 /*
- * Spray / Movement / Menu States
+ * Master / Spray / Movement / Menu States and Timers
  */
-bool sprayActive = false;
-bool sprayMoving = false;
-elapsedMillis sprayTimer;
-
+bool masterActive = true;
 bool menuActive = false;
+int8_t sprayActive = -1;
+int8_t sprayNeeded = -1;
+
+uint8_t sprayPos = 90;
+uint8_t sprayMoving = 0;
+bool sprayMoved = false;
+
+elapsedMillis sprayTimer;
+elapsedMillis statusTimer;
 elapsedMillis menuTimer;
 
 /*
@@ -213,7 +225,7 @@ class MenuDisplay {
       return(*first);
     }
 
-    bool handleButtons(buttonState btns) {
+    bool handleButtons(ButtonState btns) {
       bool redraw = false;
 
 #if DEBUG
@@ -334,6 +346,9 @@ void setupDisplay(void);
 void setupMenu(void);
 void checkButtons(void);
 void checkMenuDisplay(void);
+void checkSprayServoTimeout(void);
+void checkStartSpray(void);
+void handleRadioPacket(void);
 
 /*
  * Setup / Initialize
@@ -359,6 +374,7 @@ void setup(void) {
   // Setup Servo
   sprayServo.attach(GPIO_SPRAY_SERVO);
   sprayServo.write(90);
+  sprayPos = 90;
 
   setupRadio();
   setupMenu();
@@ -375,24 +391,41 @@ void setup(void) {
  * Main Loop
  */
 void loop(void) {
+
+  // Check Spray / Servo Moving Timeouts.
+  checkSprayServoTimeout();
+
   // Check Input Button Status
   checkButtons();
 
   // Check Menu / Timeout Status
   checkMenuDisplay();
 
-  // Check Registered Sensors / Update Status
-  // Check Servo Moving Status
-  // Check Water Level Status
   // Check Spray Start / Stop Status
-  // Check Radio For Packets
-  // Update EEPROM Sensor Storage
-  // Update Status Display
+  checkStartSpray();
 
-#if DEBUG
-  // DEBUGOUT.println(F("LOOP"));
-  // delay(500);
-#endif
+  // Check Radio For Packets
+  handleRadioPacket();
+
+  // Update EEPROM Sensor Storage?
+
+  // Update Status / Display
+  if (statusTimer > 1000) {
+
+    // Check Registered Sensors / Update Status
+    for (int i = 0; i < SENSOR_MAX; i++) {
+      if (sensors[i].lastSeen < 255) {
+        sensors[i].lastSeen++;
+      }
+    }
+
+    // TODO Check Water Level Status
+
+    // Update Status Display
+
+    statusTimer = 0;
+  }
+
 }
 
 /*
@@ -452,8 +485,10 @@ void checkButtons(void) {
  * Check if displayed menu has update / timeout.
  */
 void checkMenuDisplay(void) {
+  // Timeout Menu display
   if (menuActive && (menuTimer > MENU_TIMEOUT)) {
     menuActive = false;
+    menuTimer = 0;
     return;
   }
 
@@ -476,6 +511,137 @@ void checkMenuDisplay(void) {
     );
 #endif
 
+  }
+}
+
+/*
+ * Check Timeouts of Spray / Servo Moving.
+ */
+void checkSprayServoTimeout(void) {
+  // Check Spray timeout status
+  if ((sprayActive != -1) && (sprayTimer > PUMP_SPRAY_LENGTH)) {
+    analogWrite(GPIO_SPRAY_PUMP, 0);
+    sprayActive = -1;
+    sprayTimer = 0;
+  }
+
+  // Check Servo Moving Status
+  if ((sprayMoving > 0) && (sprayTimer > SERVO_MOVE_DELAY)) {
+    sprayPos = sprayMoving;
+    sprayMoving = 0;
+    sprayTimer = 0;
+  }
+}
+
+/*
+ * Check Spray Needed Status And Start Spray / Servo Move.
+ */
+void checkStartSpray(void) {
+  // Check Spray Start / Stop Status
+  if (
+    masterActive &&
+    !menuActive &&
+    (sprayNeeded != -1) &&
+    (sprayMoving == 0) &&
+    (sprayActive == -1)
+  ) {
+
+    Sensor sens = sensors[sprayNeeded];
+    if (!sens.baseId || !sens.active) {
+      return;
+    }
+
+    // Check servo position
+    if (sens.direction == sprayPos) {
+      // Activate Spray
+      sprayActive = sprayNeeded;
+      sprayNeeded = -1;
+      analogWrite(GPIO_SPRAY_PUMP, 255);
+
+#if DEBUG
+      printf_P(
+        PSTR("Activating spray towards sensor %s (%d).\r\n"),
+        sens.id.stype,
+        sens.id.uid
+      );
+#endif
+
+    } else {
+      // Move servo to spray position.
+      sprayMoving = sens.direction;
+      sprayServo.write(sens.direction);
+
+#if DEBUG
+      printf_P(
+        PSTR("Moving servo towards sensor %s (%d): %d.\r\n"),
+        sens.id.stype,
+        sens.id.uid,
+        sens.direction
+      );
+#endif
+
+    }
+
+    sprayTimer = 0;
+  }
+}
+
+/*
+ * Check / Handle Incoming Radio Packets
+ */
+void handleRadioPacket(void) {
+  uint8_t baseId, pipe_num;
+  Sensor recvSensor;
+
+  if (radio.available(&pipe_num)) {
+    radio.read(&recvPacket, sizeof(DataPacket));
+
+    if (!recvPacket.ptype || !recvPacket.id.uid) {
+#if DEBUG
+      DEBUGOUT.println(F("Invalid Packet Received."));
+#endif
+      return;
+    }
+
+    radio.stopListening();
+
+    if (pipe_num == 1) {
+      // Sync request
+      // handleSyncRequest();
+    } else {
+      // Identify expected sensor baseId from pipe
+      baseId = sensorBaseIds[pipe_num - 2];
+
+      // Find registered sensor by baseId
+      for (int i = 0; i < SENSOR_MAX; i++) {
+        if (sensors[i].baseId == baseId) {
+          recvSensor = sensors[i];
+        }
+      }
+
+      // Check if sent packet uid matches sensors uid
+      if (!recvSensor.baseId || (!recvSensor.isEqual(recvPacket.id))) {
+        // Unable to find sensor or id mismatch, desync.
+#if DEBUG
+        printf_P(
+          PSTR("Unable to find stored sensor %s (%d).\r\n"),
+          recvPacket.id.stype,
+          recvPacket.id.uid
+        );
+#endif
+        sendPacket.id.uid = recvPacket.id.uid;
+        strncpy(sendPacket.id.stype, recvPacket.id.stype, sizeof(sendPacket.id.stype));
+        sendPacket.ptype = PTYPE_DESYNC;
+
+        radio.openWritingPipe(control_pipes[0]);
+        radio.write(&sendPacket, sizeof(DataPacket));
+      } else {
+      }
+    }
+
+    // Send Ack or Desync packets
+
+    radio.startListening();
   }
 }
 
@@ -550,6 +716,12 @@ void setupRadio(void) {
 
   radio.openWritingPipe(control_pipes[0]);
   radio.openReadingPipe(1,control_pipes[1]);
+
+  for (int i = 2; i < SENSOR_MAX + 2; i++) {
+    radio.openReadingPipe(i, sensor_recv_pipe_mask | sensorBaseIds[i - 2]);
+  }
+
+  radio.startListening();
 
 #if DEBUG
   radio.printDetails();
