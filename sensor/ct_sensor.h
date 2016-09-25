@@ -31,6 +31,11 @@ class SensorUid {
     bool isEqual(SensorUid &comp) {
       return((uid == comp.uid) && (strcmp(stype, comp.stype) == 0));
     }
+
+    void copyFrom(SensorUid &source) {
+      uid = source.uid;
+      strncpy(stype, source.stype, sizeof(stype));
+    }
 };
 
 class Sensor {

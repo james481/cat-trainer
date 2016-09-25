@@ -349,6 +349,9 @@ void checkMenuDisplay(void);
 void checkSprayServoTimeout(void);
 void checkStartSpray(void);
 void handleRadioPacket(void);
+bool handleSyncRequest(DataPacket &req);
+bool acknowledgeSensor(Sensor &sen);
+bool desyncronizeSensor(SensorUid &sid);
 
 /*
  * Setup / Initialize
@@ -587,10 +590,178 @@ void checkStartSpray(void) {
 }
 
 /*
+ * Acknowledge Sensor Or Status Data With OK
+ */
+bool acknowledgeSensor(Sensor &sen) {
+  bool sent = false;
+  radio.stopListening();
+
+  sendPacket.id.copyFrom(sen.id);
+  sendPacket.ptype = PTYPE_OK;
+
+  radio.openWritingPipe(sensor_recv_pipe_mask | sen.baseId);
+  sent = radio.write(&sendPacket, sizeof(DataPacket));
+
+#if DEBUG
+  if (sent) {
+    printf_P(
+      PSTR("Sent Acknowledge to %s (%d) on pipe %02X.\r\n"),
+      sen.id.stype,
+      sen.id.uid,
+      sen.baseId
+    );
+  } else {
+    printf_P(
+      PSTR("Failed to send Acknowledge to %s (%d) on pipe %02X.\r\n"),
+      sen.id.stype,
+      sen.id.uid,
+      sen.baseId
+    );
+  }
+#endif
+
+  radio.startListening();
+  return(sent);
+}
+
+/*
+ * Send A Desyncronize Packet To A Sensor By ID
+ */
+bool desyncronizeSensor(SensorUid &sid) {
+  bool sent = false;
+  radio.stopListening();
+
+  sendPacket.id.copyFrom(sid);
+  sendPacket.ptype = PTYPE_DESYNC;
+
+  radio.openWritingPipe(control_pipes[0]);
+  sent = radio.write(&sendPacket, sizeof(DataPacket));
+
+#if DEBUG
+  if (sent) {
+    printf_P(
+      PSTR("Sent Desyncronize request to %s (%d).\r\n"),
+      sid.stype,
+      sid.uid
+    );
+  } else {
+    printf_P(
+      PSTR("Failed to send Desyncronize request to %s (%d).\r\n"),
+      sid.stype,
+      sid.uid
+    );
+  }
+#endif
+
+  radio.startListening();
+  return(sent);
+}
+
+/*
+ * Handle Request To Syncronize Sensor
+ */
+bool handleSyncRequest(DataPacket &req) {
+  bool sent = false;
+  int sindex = -1;
+  int freeindex = -1;
+  uint8_t newId = 0;
+
+  // Find existing or free sensor in storage
+  for (int i = 0; i < SENSOR_MAX; i++) {
+    if (sensors[i].isEqual(req.id)) {
+      sindex = i;
+      break;
+    }
+
+    if (!sensors[i].baseId && (freeindex == -1)) {
+      freeindex = i;
+    }
+  }
+
+  if (sindex != -1) {
+    sensors[sindex].lastSeen = 0;
+    sensors[sindex].vbat = req.batlevel;
+    newId = sensors[sindex].baseId;
+
+#if DEBUG
+    printf_P(
+      PSTR("Found existing record %d for %s (%d): %02X.\r\n"),
+      sindex,
+      sensors[sindex].id.stype,
+      sensors[sindex].id.uid,
+      newId
+    );
+#endif
+
+  } else if (freeindex != -1) {
+    // Create sensor storage
+    sensors[freeindex].id.copyFrom(req.id);
+    sensors[freeindex].lastSeen = 0;
+    sensors[freeindex].vbat = req.batlevel;
+    newId = sensorBaseIds[freeindex];
+    sensors[freeindex].baseId = newId;
+
+#if DEBUG
+    printf_P(
+      PSTR("Stored new record %d for %s (%d): %02X.\r\n"),
+      freeindex,
+      sensors[freeindex].id.stype,
+      sensors[freeindex].id.uid,
+      newId
+    );
+#endif
+
+  } else {
+    newId = 0;
+
+#if DEBUG
+    printf_P(
+      PSTR("Unable to store record for %s (%d).\r\n"),
+      req.id.stype,
+      req.id.uid
+    );
+#endif
+
+  }
+
+  // Return response with pipe id.
+  radio.stopListening();
+
+  sendPacket.id.copyFrom(req.id);
+  sendPacket.ptype = PTYPE_SYNCRES;
+  sendPacket.spipe = newId;
+  sendPacket.batlevel = req.batlevel;
+
+  radio.openWritingPipe(control_pipes[0]);
+  sent = radio.write(&sendPacket, sizeof(DataPacket));
+
+#if DEBUG
+  if (sent) {
+    printf_P(
+      PSTR("Sent Syncronize response to %s (%d): %02X.\r\n"),
+      sendPacket.id.stype,
+      sendPacket.id.uid,
+      sendPacket.spipe
+    );
+  } else {
+    printf_P(
+      PSTR("Failed to send Syncronize response to %s (%d).\r\n"),
+      sendPacket.id.stype,
+      sendPacket.id.uid
+    );
+  }
+#endif
+
+  radio.startListening();
+  return(sent);
+}
+
+/*
  * Check / Handle Incoming Radio Packets
  */
 void handleRadioPacket(void) {
   uint8_t baseId, pipe_num;
+  bool desync = false;
   Sensor recvSensor;
 
   if (radio.available(&pipe_num)) {
@@ -603,11 +774,9 @@ void handleRadioPacket(void) {
       return;
     }
 
-    radio.stopListening();
-
     if (pipe_num == 1) {
       // Sync request
-      // handleSyncRequest();
+      handleSyncRequest(recvPacket);
     } else {
       // Identify expected sensor baseId from pipe
       baseId = sensorBaseIds[pipe_num - 2];
@@ -620,7 +789,16 @@ void handleRadioPacket(void) {
       }
 
       // Check if sent packet uid matches sensors uid
-      if (!recvSensor.baseId || (!recvSensor.isEqual(recvPacket.id))) {
+      if (recvSensor.baseId && (recvSensor.isEqual(recvPacket.id))) {
+        if (recvPacket.ptype == PTYPE_SENSORDATA) {
+          // handleSensorData();
+        } else if (recvPacket.ptype == PTYPE_STATUS) {
+          // handleSensorStatus();
+        } else {
+          // Unknown Packet Type
+          desync = true;
+        }
+      } else {
         // Unable to find sensor or id mismatch, desync.
 #if DEBUG
         printf_P(
@@ -629,19 +807,16 @@ void handleRadioPacket(void) {
           recvPacket.id.uid
         );
 #endif
-        sendPacket.id.uid = recvPacket.id.uid;
-        strncpy(sendPacket.id.stype, recvPacket.id.stype, sizeof(sendPacket.id.stype));
-        sendPacket.ptype = PTYPE_DESYNC;
+        desync = true;
+      }
 
-        radio.openWritingPipe(control_pipes[0]);
-        radio.write(&sendPacket, sizeof(DataPacket));
+      // Send Ack or Desync packets
+      if (desync) {
+        desyncronizeSensor(recvPacket.id);
       } else {
+        acknowledgeSensor(recvSensor);
       }
     }
-
-    // Send Ack or Desync packets
-
-    radio.startListening();
   }
 }
 
