@@ -18,7 +18,7 @@
  * NRF24L01
  */
 #define RADIO_CHANNEL 76
-#define RADIO_TIMEOUT 250
+#define RADIO_TIMEOUT 500
 
 /*
  * ID Storage (EEPROM)
@@ -45,7 +45,7 @@ class Sensor {
     uint8_t direction = 90;
     uint8_t lastSeen = 0;
     bool active = false;
-    float vbat;
+    uint8_t vbat;
 
     bool isEqual(SensorUid &comp) {
       return(id.isEqual(comp));
@@ -63,11 +63,10 @@ struct DataPacket {
   SensorUid id;
   uint8_t ptype;
   uint8_t spipe;
-  float batlevel;
+  uint8_t batlevel;
 };
 
-const uint64_t control_pipes[2] = { 0xA0A0A0A0E1LL, 0xF0F0F0F0A1LL };
+const uint64_t control_pipes[2] = { 0xF0F0F0F0AALL, 0xF0F0F0F0A1LL };
 const uint64_t sensor_send_pipe_mask = 0xF0F0F0F000LL;
-const uint64_t sensor_recv_pipe_mask = 0xD0D0D0D000LL;
 
 // vim:cin:ai:sts=2 sw=2 ft=cpp

@@ -14,12 +14,13 @@
 #include "nRF24L01.h"
 #include "RF24.h"
 #include "printf.h"
+#include "ct_sensor.h"
 
 /*
  * Configuration
  */
 #define DEBUG true
-#define FEATHER32U4 true
+// #define FEATHER32U4 true
 #define BAT_VCC_HIGH 4.0
 #define BAT_VCC_MED 3.5
 #define RADIO_CHANNEL 76
@@ -83,21 +84,11 @@
 #define CTRL_REG5 0x2E
 
 /*
- * Radio Packet IDs
- */
-#define PTYPE_SYNCDATA 1
-#define PTYPE_SYNCRES 2
-#define PTYPE_SENSORDATA 3
-#define PTYPE_STATUS 4
-
-/*
  * Hardware Config
  */
 
 // NRF24L01+ Setup
 RF24 radio(GPIO_RF24_CE, GPIO_RF24_CSN);
-const uint64_t control_pipes[2] = { 0xA0A0A0A0E1LL, 0xF0F0F0F0A1LL };
-const uint64_t sensor_pipe_mask = 0xF0F0F0F000LL;
 uint8_t sensorId = 0;
 
 /*
@@ -111,20 +102,12 @@ bool statusLedActive = false;
 /*
  * ID Storage (EEPROM)
  */
-struct sensorUid {
-  char stype[11];
-  uint8_t uid;
-} myUid;
+SensorUid myUid;
 
 /*
  * Data Packets
  */
-struct dataPacket {
-  sensorUid id;
-  uint8_t ptype;
-  uint8_t spipe;
-  float batlevel;
-} sendPacket, recPacket;
+DataPacket sendPacket, recPacket;
 
 /*
  * Setup / Initialize
@@ -211,7 +194,7 @@ void loop(void) {
   } else {
     // Delay for a while before attempting another sync, this is fine
     // to be blocking (events won't be handled until synced).
-    delay(1000);
+    delay(3000);
   }
 
 #if DEBUG
@@ -275,7 +258,7 @@ void enterSleep(void) {
 /*
  * Get the current battery voltage (or 3.3 if debug)
  */
-float getBatteryVoltage(void) {
+uint8_t getBatteryVoltage(void) {
 
 #ifdef FEATHER32U4
   float measuredvbat = analogRead(FEATHER32U4_BATTERY_PIN);
@@ -289,7 +272,7 @@ float getBatteryVoltage(void) {
 #endif
 
 #else
-  float measuredvbat = 3.3;
+  uint8_t measuredvbat = 33;
 #endif
 
   return(measuredvbat);
@@ -456,10 +439,10 @@ void sendSensorStatus(void) {
     uint8_t len = radio.getDynamicPayloadSize();
 
 #if DEBUG
-    printf_P(PSTR("Received status length %d, expecting %d\r\n"), len, sizeof(recPacket));
+    printf_P(PSTR("Received status length %d, expecting %d\r\n"), len, sizeof(DataPacket));
 #endif
 
-    if (len && (len == sizeof(recPacket))) {
+    if (len && (len == sizeof(DataPacket))) {
       radio.read(&recPacket, len);
     }
 
@@ -638,9 +621,10 @@ void syncSensor(void) {
 
   radio.stopListening();
 
-  // Open new writing pipe
+  // Open new reading / writing pipe.
   if (sensorId) {
-    radio.openWritingPipe(sensor_pipe_mask | sensorId);
+    radio.openWritingPipe(sensor_send_pipe_mask | sensorId);
+    radio.openReadingPipe(2, sensor_send_pipe_mask | sensorId);
   }
 
   // Power the radio back down.

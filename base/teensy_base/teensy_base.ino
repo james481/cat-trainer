@@ -341,6 +341,8 @@ MenuItem mi_masteroff("Off", 22);
 
 MenuDisplay menu(&display, &mi_root);
 
+void setup(void);
+void loop(void);
 void setupRadio(void);
 void setupDisplay(void);
 void setupMenu(void);
@@ -349,6 +351,8 @@ void checkMenuDisplay(void);
 void checkSprayServoTimeout(void);
 void checkStartSpray(void);
 void handleRadioPacket(void);
+void handleSensorData(uint8_t sindex, DataPacket &status);
+void handleSensorStatus(uint8_t sindex, DataPacket &status);
 bool handleSyncRequest(DataPacket &req);
 bool acknowledgeSensor(Sensor &sen);
 bool desyncronizeSensor(SensorUid &sid);
@@ -410,7 +414,7 @@ void loop(void) {
   // Check Radio For Packets
   handleRadioPacket();
 
-  // Update EEPROM Sensor Storage?
+  // TODO Update EEPROM Sensor Storage
 
   // Update Status / Display
   if (statusTimer > 1000) {
@@ -428,7 +432,6 @@ void loop(void) {
 
     statusTimer = 0;
   }
-
 }
 
 /*
@@ -551,6 +554,15 @@ void checkStartSpray(void) {
 
     Sensor sens = sensors[sprayNeeded];
     if (!sens.baseId || !sens.active) {
+
+#if DEBUG
+      printf_P(
+        PSTR("checkStartSpray: Sensor not active or no baseId for %d.\r\n"),
+        sprayNeeded
+      );
+#endif
+
+      sprayNeeded = -1;
       return;
     }
 
@@ -599,7 +611,7 @@ bool acknowledgeSensor(Sensor &sen) {
   sendPacket.id.copyFrom(sen.id);
   sendPacket.ptype = PTYPE_OK;
 
-  radio.openWritingPipe(sensor_recv_pipe_mask | sen.baseId);
+  radio.openWritingPipe(sensor_send_pipe_mask | sen.baseId);
   sent = radio.write(&sendPacket, sizeof(DataPacket));
 
 #if DEBUG
@@ -658,6 +670,50 @@ bool desyncronizeSensor(SensorUid &sid) {
 }
 
 /*
+ * Handle Sensor Trigger Data Packet
+ */
+void handleSensorData(uint8_t sindex, DataPacket &status) {
+  if (sensors[sindex].baseId) {
+    sensors[sindex].lastSeen = 0;
+    sensors[sindex].vbat = status.batlevel;
+
+    // TODO Debounce / Queue Triggers
+    if (sprayNeeded == -1) {
+      sprayNeeded = sindex;
+    }
+
+#if DEBUG
+    printf_P(
+      PSTR("Handle sensor trigger %s (%d): %d.\r\n"),
+      sensors[sindex].id.stype,
+      sensors[sindex].id.uid,
+      sensors[sindex].vbat
+    );
+#endif
+  }
+}
+
+/*
+ * Handle Sensor Status Update Packet
+ */
+void handleSensorStatus(uint8_t sindex, DataPacket &status) {
+  // Reset sensor last seen / battery voltage
+  if (sensors[sindex].baseId) {
+    sensors[sindex].lastSeen = 0;
+    sensors[sindex].vbat = status.batlevel;
+
+#if DEBUG
+    printf_P(
+      PSTR("Updated sensor status %s (%d): %d.\r\n"),
+      sensors[sindex].id.stype,
+      sensors[sindex].id.uid,
+      sensors[sindex].vbat
+    );
+#endif
+  }
+}
+
+/*
  * Handle Request To Syncronize Sensor
  */
 bool handleSyncRequest(DataPacket &req) {
@@ -700,6 +756,7 @@ bool handleSyncRequest(DataPacket &req) {
     sensors[freeindex].vbat = req.batlevel;
     newId = sensorBaseIds[freeindex];
     sensors[freeindex].baseId = newId;
+    sensors[freeindex].active = true;
 
 #if DEBUG
     printf_P(
@@ -760,7 +817,7 @@ bool handleSyncRequest(DataPacket &req) {
  * Check / Handle Incoming Radio Packets
  */
 void handleRadioPacket(void) {
-  uint8_t baseId, pipe_num;
+  uint8_t baseId, pipe_num, sindex = 0;
   bool desync = false;
   Sensor recvSensor;
 
@@ -774,7 +831,7 @@ void handleRadioPacket(void) {
       return;
     }
 
-    if (pipe_num == 1) {
+    if (pipe_num < 2) {
       // Sync request
       handleSyncRequest(recvPacket);
     } else {
@@ -785,15 +842,17 @@ void handleRadioPacket(void) {
       for (int i = 0; i < SENSOR_MAX; i++) {
         if (sensors[i].baseId == baseId) {
           recvSensor = sensors[i];
+          sindex = i;
+          break;
         }
       }
 
       // Check if sent packet uid matches sensors uid
       if (recvSensor.baseId && (recvSensor.isEqual(recvPacket.id))) {
         if (recvPacket.ptype == PTYPE_SENSORDATA) {
-          // handleSensorData();
+          handleSensorData(sindex, recvPacket);
         } else if (recvPacket.ptype == PTYPE_STATUS) {
-          // handleSensorStatus();
+          handleSensorStatus(sindex, recvPacket);
         } else {
           // Unknown Packet Type
           desync = true;
@@ -893,7 +952,17 @@ void setupRadio(void) {
   radio.openReadingPipe(1,control_pipes[1]);
 
   for (int i = 2; i < SENSOR_MAX + 2; i++) {
-    radio.openReadingPipe(i, sensor_recv_pipe_mask | sensorBaseIds[i - 2]);
+    uint8_t pipeBaseId = sensorBaseIds[i - 2];
+
+#if DEBUG
+    printf_P(
+      PSTR("Opening Radio Pipe %d: %02X.\r\n"),
+      i,
+      pipeBaseId
+    );
+#endif
+
+    radio.openReadingPipe(i, sensor_send_pipe_mask | pipeBaseId);
   }
 
   radio.startListening();
