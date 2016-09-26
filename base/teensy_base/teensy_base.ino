@@ -24,7 +24,7 @@
  */
 
 #define MENU_TIMEOUT 10000 // ms until menu exits
-#define SENSOR_MAX 4 // No More than 4
+#define SENSOR_MAX 4 // No more than 4 on NRF24L01
 #define DEBUG true
 #define DEBUGOUT Serial
 
@@ -127,8 +127,15 @@ class MenuItem {
       if (labelCb && useCb) {
         return(labelCb(*this));
       }
-
       return(itemLabel);
+    }
+
+    char* getValue() {
+      if (valueCb) {
+        valueCb(*this, itemVal);
+      }
+
+      return(itemVal);
     }
 
     const uint8_t getUid() const {
@@ -149,7 +156,10 @@ class MenuItem {
       return(below);
     }
 
-    MenuItem *getChild() const {
+    MenuItem *getChild(bool useCb = true) {
+      if (childCb && useCb) {
+        return(childCb(*this));
+      }
       return(child);
     }
 
@@ -186,6 +196,10 @@ class MenuItem {
       return(*this);
     }
 
+    bool hasValue() {
+      return((valueCb) ? true : false);
+    }
+
     bool isEqual(MenuItem &item) {
       return(getUid() == item.getUid());
     }
@@ -206,13 +220,24 @@ class MenuItem {
       return(*this);
     }
 
+    MenuItem &setChildCb(std::function<MenuItem* (MenuItem &item)> cb) {
+      childCb = cb;
+      return(*this);
+    }
+
     MenuItem &setLabelCb(std::function<const char* (MenuItem &item)> cb) {
       labelCb = cb;
       return(*this);
     }
 
+    MenuItem &setValueCb(std::function<void (MenuItem &item, char* val)> cb) {
+      valueCb = cb;
+      return(*this);
+    }
+
   protected:
     const char* itemLabel;
+    char itemVal[10];
     const uint8_t itemUid;
 
     MenuItem *above;
@@ -221,8 +246,10 @@ class MenuItem {
     MenuItem *parent;
 
     cb_exe cbExe;
-    std::function<const char* (MenuItem &item)> labelCb;
     std::function<bool (MenuItem &item)> activeCb;
+    std::function<MenuItem* (MenuItem &item)> childCb;
+    std::function<const char* (MenuItem &item)> labelCb;
+    std::function<void (MenuItem &item, char* val)> valueCb;
 };
 
 class MenuDisplay {
@@ -325,7 +352,20 @@ class MenuDisplay {
         }
 
         if (cur->isActive()) {
-          display.println(cur->getLabel());
+          if (cur->hasValue()) {
+            int padding = 21 - strlen(cur->getLabel()) - strlen(cur->getValue());
+            padding = (padding > 0) ? padding : 0;
+            display.print(cur->getLabel());
+
+            while (padding > 0) {
+              display.print(" ");
+              padding--;
+            }
+
+            display.println(cur->getValue());
+          } else {
+            display.println(cur->getLabel());
+          }
         }
 
         cur = cur->getBelow();
@@ -356,9 +396,14 @@ MenuItem mi_sensor3("Sensor 3", 12);
 MenuItem mi_sensor4("Sensor 4", 13);
 MenuItem mi_sensorN("No Sensors Found", 15);
 
-MenuItem mi_master("Master On / Off", 20);
-MenuItem mi_masteron("On", 21);
-MenuItem mi_masteroff("Off", 22);
+MenuItem mi_sensor_active("Active:", 20);
+MenuItem mi_sensor_dir("Direction:", 21);
+MenuItem mi_sensor_vbat("Battery:", 22);
+MenuItem mi_sensor_lastseen("Last Seen:", 23);
+
+MenuItem mi_master("Master On / Off", 100);
+MenuItem mi_masteron("On", 101);
+MenuItem mi_masteroff("Off", 102);
 
 MenuDisplay menu(&display, &mi_root);
 
@@ -977,28 +1022,37 @@ void setupMenu(void) {
     return(item.getLabel(false));
   };
 
+  // Add sensor edit items dynamically as sensor menu children
+  std::function<MenuItem* (MenuItem &item)> sensChildCb = [] (MenuItem &item) {
+    return(&mi_sensor_active);
+  };
+
   mi_root.setChild(mi_sensors);
   mi_sensors.setChild(mi_sensor1);
 
   mi_sensor1
     .setActiveCb(sensActiveCb)
+    .setChildCb(sensChildCb)
     .setLabelCb(labelCb)
     .addBelow(mi_sensor2);
 
   mi_sensor2
     .setActiveCb(sensActiveCb)
+    .setChildCb(sensChildCb)
     .setLabelCb(labelCb)
     .setParent(mi_sensors)
     .addBelow(mi_sensor3);
 
   mi_sensor3
     .setActiveCb(sensActiveCb)
+    .setChildCb(sensChildCb)
     .setLabelCb(labelCb)
     .setParent(mi_sensors)
     .addBelow(mi_sensor4);
 
   mi_sensor4
     .setActiveCb(sensActiveCb)
+    .setChildCb(sensChildCb)
     .setLabelCb(labelCb)
     .setParent(mi_sensors)
     .addBelow(mi_sensorN);
@@ -1006,6 +1060,57 @@ void setupMenu(void) {
   mi_sensorN
     .setActiveCb(noneActiveCb)
     .setParent(mi_sensors);
+
+  mi_sensor_active
+    .setParent(mi_sensor1)
+    .addBelow(mi_sensor_dir)
+    .setValueCb([] (MenuItem &item, char* val) {
+      if (item.getParent()) {
+        uint8_t sensorId = item.getParent()->getUid() - 10;
+        if (sensors[sensorId].baseId) {
+          const char* active = (sensors[sensorId].active) ? "On" : "Off";
+          strncpy(val, active, 9);
+        }
+      }
+    });
+
+  mi_sensor_dir
+    .setParent(mi_sensor1)
+    .addBelow(mi_sensor_vbat)
+    .setValueCb([] (MenuItem &item, char* val) {
+      if (item.getParent()) {
+        uint8_t sensorId = item.getParent()->getUid() - 10;
+        if (sensors[sensorId].baseId) {
+          snprintf(val, 9, "%d", sensors[sensorId].direction);
+        }
+      }
+    });
+
+  mi_sensor_vbat
+    .setParent(mi_sensor1)
+    .addBelow(mi_sensor_lastseen)
+    .setValueCb([] (MenuItem &item, char* val) {
+      if (item.getParent()) {
+        uint8_t sensorId = item.getParent()->getUid() - 10;
+        if (sensors[sensorId].baseId) {
+          uint8_t vwhole, vpart;
+          vwhole = sensors[sensorId].vbat / 10;
+          vpart = sensors[sensorId].vbat % 10;
+          snprintf(val, 9, "%d.%d", vwhole, vpart);
+        }
+      }
+    });
+
+  mi_sensor_lastseen
+    .setParent(mi_sensor1)
+    .setValueCb([] (MenuItem &item, char* val) {
+      if (item.getParent()) {
+        uint8_t sensorId = item.getParent()->getUid() - 10;
+        if (sensors[sensorId].baseId) {
+          snprintf(val, 9, "%d", sensors[sensorId].lastSeen);
+        }
+      }
+    });
 
   mi_masteron.addBelow(mi_masteroff);
   mi_master.setChild(mi_masteron);
