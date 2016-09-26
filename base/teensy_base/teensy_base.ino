@@ -104,12 +104,6 @@ elapsedMillis menuTimer;
 class MenuItem;
 class MenuDisplay;
 
-struct MenuExeEvent {
-  MenuItem &item;
-};
-
-typedef void (*cb_exe)(MenuExeEvent);
-
 class MenuItem {
   public:
     MenuItem(const char* label, const uint8_t uid) : itemLabel(label), itemUid(uid) {
@@ -167,9 +161,14 @@ class MenuItem {
       return(parent);
     }
 
-    MenuItem &onExe(cb_exe cb) {
-      cbExe = cb;
-      return(*this);
+    bool getItemEditable() {
+      return(itemEditable);
+    }
+
+    void handleEdit(ButtonState btns) {
+      if (editCb) {
+        editCb(*this, btns);
+      }
     }
 
     MenuItem &setParent(MenuItem &item) {
@@ -181,6 +180,11 @@ class MenuItem {
       child = &item;
       item.parent = this;
 
+      return(*this);
+    }
+
+    MenuItem &setItemEditable(bool editable) {
+      itemEditable = editable;
       return(*this);
     }
 
@@ -208,13 +212,6 @@ class MenuItem {
       return(getUid() == item->getUid());
     }
 
-    void execute() {
-      if (cbExe) {
-        MenuExeEvent ev = { *this };
-        (*cbExe)(ev);
-      }
-    }
-
     MenuItem &setActiveCb(std::function<bool (MenuItem &item)> acb) {
       activeCb = acb;
       return(*this);
@@ -222,6 +219,11 @@ class MenuItem {
 
     MenuItem &setChildCb(std::function<MenuItem* (MenuItem &item)> cb) {
       childCb = cb;
+      return(*this);
+    }
+
+    MenuItem &setEditCb(std::function<void (MenuItem &item, ButtonState &btns)> cb) {
+      editCb = cb;
       return(*this);
     }
 
@@ -239,15 +241,18 @@ class MenuItem {
     const char* itemLabel;
     char itemVal[10];
     const uint8_t itemUid;
+    bool itemEditable = false;
 
+    // Linked Matrix
     MenuItem *above;
     MenuItem *below;
     MenuItem *child;
     MenuItem *parent;
 
-    cb_exe cbExe;
+    // Event Callback Lambdas
     std::function<bool (MenuItem &item)> activeCb;
     std::function<MenuItem* (MenuItem &item)> childCb;
+    std::function<void (MenuItem &item, ButtonState &btns)> editCb;
     std::function<const char* (MenuItem &item)> labelCb;
     std::function<void (MenuItem &item, char* val)> valueCb;
 };
@@ -288,11 +293,15 @@ class MenuDisplay {
           setCurrent(current->getChild());
           findFirst(current);
           redraw = true;
-        } else {
-          current->execute();
+        } else if (current->getItemEditable()) {
+          isEditing = true;
+          redraw = true;
         }
       } else if (btns.enter == 2) {
-        if (current->getParent()) {
+        if (isEditing) {
+          isEditing = false;
+          redraw = true;
+        } else if (current->getParent()) {
           setCurrent(current->getParent());
           findFirst(current);
           redraw = !current->isEqual(root);
@@ -304,12 +313,13 @@ class MenuDisplay {
       }
 
       // Handle Up / Down press
-      if (btns.up && current->getAbove(true)) {
+      if (isEditing && (btns.up || btns.down)) {
+        current->handleEdit(btns);
+        redraw = true;
+      } else if (btns.up && current->getAbove(true)) {
         setCurrent(current->getAbove(true));
         redraw = true;
-      }
-
-      if (btns.down && current->getBelow(true)) {
+      } else if (btns.down && current->getBelow(true)) {
         setCurrent(current->getBelow(true));
         redraw = true;
       }
@@ -344,6 +354,11 @@ class MenuDisplay {
 
       MenuItem *cur = first;
 
+      if (cur->getParent()) {
+        display.println(cur->getParent()->getLabel());
+        display.println();
+      }
+
       while (cur) {
         if (cur == current) {
           display.setTextColor(BLACK, WHITE);
@@ -353,13 +368,22 @@ class MenuDisplay {
 
         if (cur->isActive()) {
           if (cur->hasValue()) {
-            int padding = 21 - strlen(cur->getLabel()) - strlen(cur->getValue());
+
+            int padding =
+              21 - strlen(cur->getLabel()) - strlen(cur->getValue());
             padding = (padding > 0) ? padding : 0;
+
+            if (isEditing) { display.setTextColor(WHITE); }
+
             display.print(cur->getLabel());
 
             while (padding > 0) {
               display.print(" ");
               padding--;
+            }
+
+            if ((cur == current) && isEditing) {
+              display.setTextColor(BLACK, WHITE);
             }
 
             display.println(cur->getValue());
@@ -384,6 +408,7 @@ class MenuDisplay {
     MenuItem *root;
     MenuItem *current;
     MenuItem *first;
+    bool isEditing = false;
 };
 
 // Menu item objects, note UIDs are used for functional purposes.
@@ -401,9 +426,7 @@ MenuItem mi_sensor_dir("Direction:", 21);
 MenuItem mi_sensor_vbat("Battery:", 22);
 MenuItem mi_sensor_lastseen("Last Seen:", 23);
 
-MenuItem mi_master("Master On / Off", 100);
-MenuItem mi_masteron("On", 101);
-MenuItem mi_masteroff("Off", 102);
+MenuItem mi_master("Master Active:", 100);
 
 MenuDisplay menu(&display, &mi_root);
 
@@ -1030,6 +1053,7 @@ void setupMenu(void) {
   mi_root.setChild(mi_sensors);
   mi_sensors.setChild(mi_sensor1);
 
+  // Sensor Items
   mi_sensor1
     .setActiveCb(sensActiveCb)
     .setChildCb(sensChildCb)
@@ -1061,9 +1085,11 @@ void setupMenu(void) {
     .setActiveCb(noneActiveCb)
     .setParent(mi_sensors);
 
+  // Sensor Status / Edit Items
   mi_sensor_active
     .setParent(mi_sensor1)
     .addBelow(mi_sensor_dir)
+    .setItemEditable(true)
     .setValueCb([] (MenuItem &item, char* val) {
       if (item.getParent()) {
         uint8_t sensorId = item.getParent()->getUid() - 10;
@@ -1072,16 +1098,42 @@ void setupMenu(void) {
           strncpy(val, active, 9);
         }
       }
+    })
+    .setEditCb([] (MenuItem &item, ButtonState &btns) {
+      if (item.getParent()) {
+        uint8_t sensorId = item.getParent()->getUid() - 10;
+        if (sensors[sensorId].baseId) {
+          if (btns.up || btns.down) {
+            sensors[sensorId].active = !sensors[sensorId].active;
+          }
+        }
+      }
     });
 
   mi_sensor_dir
     .setParent(mi_sensor1)
     .addBelow(mi_sensor_vbat)
+    .setItemEditable(true)
     .setValueCb([] (MenuItem &item, char* val) {
       if (item.getParent()) {
         uint8_t sensorId = item.getParent()->getUid() - 10;
         if (sensors[sensorId].baseId) {
           snprintf(val, 9, "%d", sensors[sensorId].direction);
+        }
+      }
+    })
+    .setEditCb([] (MenuItem &item, ButtonState &btns) {
+      if (item.getParent()) {
+        uint8_t sensorId = item.getParent()->getUid() - 10;
+        if (sensors[sensorId].baseId) {
+          uint8_t dir = sensors[sensorId].direction;
+          if (btns.up && (dir < 180)) {
+            sensors[sensorId].direction += ((dir < 170) ? 10 : 2);
+          } else if (btns.down && (dir > 1)) {
+            sensors[sensorId].direction -= ((dir > 11) ? 10 : 2);
+          }
+
+          sprayServo.write(sensors[sensorId].direction);
         }
       }
     });
@@ -1112,10 +1164,19 @@ void setupMenu(void) {
       }
     });
 
-  mi_masteron.addBelow(mi_masteroff);
-  mi_master.setChild(mi_masteron);
-  mi_masteroff.setParent(mi_master);
-  mi_master.setParent(mi_root);
+  // Master Active Setting
+  mi_master
+    .setParent(mi_root)
+    .setItemEditable(true)
+    .setValueCb([] (MenuItem &item, char* val) {
+      const char* active = (masterActive) ? "On" : "Off";
+      strncpy(val, active, 9);
+    })
+    .setEditCb([] (MenuItem &item, ButtonState &btns) {
+      if (btns.up || btns.down) {
+        masterActive = !masterActive;
+      }
+    });
 
   mi_sensors.addBelow(mi_master);
 }
