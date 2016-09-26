@@ -6,6 +6,7 @@
  * compatible host.
  */
 
+#include <functional>
 #include <SPI.h>
 #include <Wire.h>
 #include <EEPROM.h>
@@ -23,7 +24,7 @@
  */
 
 #define MENU_TIMEOUT 10000 // ms until menu exits
-#define SENSOR_MAX 3 // No More than 4
+#define SENSOR_MAX 4 // No More than 4
 #define DEBUG true
 #define DEBUGOUT Serial
 
@@ -115,27 +116,44 @@ class MenuItem {
       parent = child = above = below = 0;
     }
 
-    inline const char* getLabel() const {
+    const bool isActive() {
+      if (activeCb) {
+        return(activeCb(*this));
+      }
+      return(true);
+    }
+
+    const char* getLabel(bool useCb = true) {
+      if (labelCb && useCb) {
+        return(labelCb(*this));
+      }
+
       return(itemLabel);
     }
 
-    inline const uint8_t getUid() const {
+    const uint8_t getUid() const {
       return(itemUid);
     }
 
-    inline MenuItem *getAbove() const {
+    MenuItem *getAbove(bool onlyActive = false) const {
+      if (onlyActive && above) {
+        return((above->isActive()) ? above : above->getAbove(true));
+      }
       return(above);
     }
 
-    inline MenuItem *getBelow() const {
+    MenuItem *getBelow(bool onlyActive = false) {
+      if (onlyActive && below) {
+        return((below->isActive()) ? below : below->getBelow(true));
+      }
       return(below);
     }
 
-    inline MenuItem *getChild() const {
+    MenuItem *getChild() const {
       return(child);
     }
 
-    inline MenuItem *getParent() const {
+    MenuItem *getParent() const {
       return(parent);
     }
 
@@ -146,37 +164,26 @@ class MenuItem {
 
     MenuItem &setParent(MenuItem &item) {
       parent = &item;
-      return(item);
+      return(*this);
     }
 
     MenuItem &setChild(MenuItem &item) {
-
-#if DEBUG
-      printf_P(
-        PSTR("Setting Menu item %s (%d) to child %s (%d).\r\n"),
-        this->getLabel(),
-        this->getUid(),
-        item.getLabel(),
-        item.getUid()
-      );
-#endif
-
       child = &item;
       item.parent = this;
 
-      return(item);
+      return(*this);
     }
 
     MenuItem &addAbove(MenuItem &item) {
       item.below = this;
       above = &item;
-      return(item);
+      return(*this);
     }
 
     MenuItem &addBelow(MenuItem &item) {
       item.above = this;
       below = &item;
-      return(item);
+      return(*this);
     }
 
     bool isEqual(MenuItem &item) {
@@ -194,6 +201,16 @@ class MenuItem {
       }
     }
 
+    MenuItem &setActiveCb(std::function<bool (MenuItem &item)> acb) {
+      activeCb = acb;
+      return(*this);
+    }
+
+    MenuItem &setLabelCb(std::function<const char* (MenuItem &item)> cb) {
+      labelCb = cb;
+      return(*this);
+    }
+
   protected:
     const char* itemLabel;
     const uint8_t itemUid;
@@ -204,6 +221,8 @@ class MenuItem {
     MenuItem *parent;
 
     cb_exe cbExe;
+    std::function<const char* (MenuItem &item)> labelCb;
+    std::function<bool (MenuItem &item)> activeCb;
 };
 
 class MenuDisplay {
@@ -257,19 +276,15 @@ class MenuDisplay {
         }
       }
 
-      // Handle Up press
-      if (btns.up) {
-        if (current->getAbove()) {
-          setCurrent(current->getAbove());
-          redraw = true;
-        }
+      // Handle Up / Down press
+      if (btns.up && current->getAbove(true)) {
+        setCurrent(current->getAbove(true));
+        redraw = true;
       }
 
-      if (btns.down) {
-        if (current->getBelow()) {
-          setCurrent(current->getBelow());
-          redraw = true;
-        }
+      if (btns.down && current->getBelow(true)) {
+        setCurrent(current->getBelow(true));
+        redraw = true;
       }
 
       if (redraw) {
@@ -309,7 +324,10 @@ class MenuDisplay {
           display.setTextColor(WHITE);
         }
 
-        display.println(cur->getLabel());
+        if (cur->isActive()) {
+          display.println(cur->getLabel());
+        }
+
         cur = cur->getBelow();
       }
 
@@ -328,18 +346,33 @@ class MenuDisplay {
     MenuItem *first;
 };
 
+// Menu item objects, note UIDs are used for functional purposes.
 MenuItem mi_root("Main Menu", 1);
 
-MenuItem mi_sensors("Sensors", 10);
-MenuItem mi_sensor1("Sensor 1", 11);
-MenuItem mi_sensor2("Sensor 2", 12);
-MenuItem mi_sensor3("Sensor 3", 13);
+MenuItem mi_sensors("Sensors", 9);
+MenuItem mi_sensor1("Sensor 1", 10);
+MenuItem mi_sensor2("Sensor 2", 11);
+MenuItem mi_sensor3("Sensor 3", 12);
+MenuItem mi_sensor4("Sensor 4", 13);
+MenuItem mi_sensorN("No Sensors Found", 15);
 
 MenuItem mi_master("Master On / Off", 20);
 MenuItem mi_masteron("On", 21);
 MenuItem mi_masteroff("Off", 22);
 
 MenuDisplay menu(&display, &mi_root);
+
+/*
+ * This ugly bit of hackery is needed for functional
+ * to compile using some types of lambdas.
+ */
+namespace std
+{
+  void __throw_bad_function_call()
+  {
+  }
+}
+
 
 void setup(void);
 void loop(void);
@@ -912,13 +945,67 @@ void setupMenu(void) {
   DEBUGOUT.println(F("Initializing Menu:"));
 #endif
 
-  mi_root.setChild(mi_sensors);
+  // Hide sensor items that aren't synced
+  std::function<bool (MenuItem &item)> sensActiveCb = [] (MenuItem &item) {
+    bool sensActive = true;
+    uint8_t sensorId = item.getUid() - 10;
+    sensActive = (sensors[sensorId].baseId > 0) ? true : false;
+    return(sensActive);
+  };
 
-  mi_sensor1.addBelow(mi_sensor2);
-  mi_sensor2.addBelow(mi_sensor3);
-  mi_sensor2.setParent(mi_sensors);
-  mi_sensor3.setParent(mi_sensors);
+  // Display "none" sensor item if no sensors found
+  std::function<bool (MenuItem &item)> noneActiveCb = [] (MenuItem &item) {
+    bool noneActive = true;
+    for (int i = 0; i < SENSOR_MAX; i++) {
+      if (sensors[i].baseId) {
+        noneActive = false;
+        break;
+      }
+    }
+
+    return(noneActive);
+  };
+
+  // Render sensor items as sensor name
+  std::function<const char* (MenuItem &item)> labelCb = [] (MenuItem &item) {
+    uint8_t sensorId = item.getUid() - 10;
+    if (sensors[sensorId].baseId) {
+      const char* type = sensors[sensorId].id.stype;
+      return(type);
+    }
+
+    return(item.getLabel(false));
+  };
+
+  mi_root.setChild(mi_sensors);
   mi_sensors.setChild(mi_sensor1);
+
+  mi_sensor1
+    .setActiveCb(sensActiveCb)
+    .setLabelCb(labelCb)
+    .addBelow(mi_sensor2);
+
+  mi_sensor2
+    .setActiveCb(sensActiveCb)
+    .setLabelCb(labelCb)
+    .setParent(mi_sensors)
+    .addBelow(mi_sensor3);
+
+  mi_sensor3
+    .setActiveCb(sensActiveCb)
+    .setLabelCb(labelCb)
+    .setParent(mi_sensors)
+    .addBelow(mi_sensor4);
+
+  mi_sensor4
+    .setActiveCb(sensActiveCb)
+    .setLabelCb(labelCb)
+    .setParent(mi_sensors)
+    .addBelow(mi_sensorN);
+
+  mi_sensorN
+    .setActiveCb(noneActiveCb)
+    .setParent(mi_sensors);
 
   mi_masteron.addBelow(mi_masteroff);
   mi_master.setChild(mi_masteron);
@@ -953,15 +1040,6 @@ void setupRadio(void) {
 
   for (int i = 2; i < SENSOR_MAX + 2; i++) {
     uint8_t pipeBaseId = sensorBaseIds[i - 2];
-
-#if DEBUG
-    printf_P(
-      PSTR("Opening Radio Pipe %d: %02X.\r\n"),
-      i,
-      pipeBaseId
-    );
-#endif
-
     radio.openReadingPipe(i, sensor_send_pipe_mask | pipeBaseId);
   }
 
