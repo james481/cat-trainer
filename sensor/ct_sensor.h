@@ -45,7 +45,8 @@ class Sensor {
     uint8_t direction = 90;
     uint8_t lastSeen = 0;
     bool active = false;
-    uint8_t vbat;
+    uint8_t vbat = 0;
+    uint16_t activated = 0;
 
     bool isEqual(SensorUid &comp) {
       return(id.isEqual(comp));

@@ -25,6 +25,7 @@
 
 #define MENU_TIMEOUT 10000 // ms until menu exits
 #define SENSOR_MAX 4 // No more than 4 on NRF24L01
+#define DISPLAY_INVERT 30 // Seconds between status display invert
 #define DEBUG true
 #define DEBUGOUT Serial
 
@@ -37,13 +38,15 @@
 #define GPIO_BTN_DN 7
 #define GPIO_BTN_UP 8
 #define GPIO_DEBOUNCE 10
-#define GPIO_BTN_HOLD_DELAY 750
+#define GPIO_BTN_HOLD_DELAY 500
 
 // Pump / Servo
 #define SERVO_MOVE_DELAY 500
 #define PUMP_SPRAY_LENGTH 1000
 #define GPIO_SPRAY_PUMP A6
 #define GPIO_SPRAY_SERVO A7
+#define SERVO_MIN_LEN 1050
+#define SERVO_MAX_LEN 2050
 
 #define GPIO_OLED_RESET 17
 
@@ -87,12 +90,15 @@ const uint8_t sensorBaseIds[4] = { 0xB1, 0xC2, 0xD3, 0xE4 };
  */
 bool masterActive = true;
 bool menuActive = false;
+bool redrawStatus = false;
 int8_t sprayActive = -1;
 int8_t sprayNeeded = -1;
 
 uint8_t sprayPos = 90;
 uint8_t sprayMoving = 0;
-bool sprayMoved = false;
+
+bool displayInvert = false;
+uint8_t displayInvertTimer = 0;
 
 elapsedMillis sprayTimer;
 elapsedMillis statusTimer;
@@ -150,10 +156,15 @@ class MenuItem {
       return(below);
     }
 
-    MenuItem *getChild(bool useCb = true) {
+    MenuItem *getChild(bool onlyActive = true, bool useCb = true) {
       if (childCb && useCb) {
         return(childCb(*this));
       }
+
+      if (onlyActive && child && !child->isActive() && child->getBelow()) {
+        return(child->getBelow(true));
+      }
+
       return(child);
     }
 
@@ -289,12 +300,15 @@ class MenuDisplay {
 
       // Handle Enter press / hold
       if (btns.enter == 1) {
-        if (current->getChild()) {
-          setCurrent(current->getChild());
-          findFirst(current);
+        if (isEditing) {
+          isEditing = false;
           redraw = true;
         } else if (current->getItemEditable()) {
           isEditing = true;
+          redraw = true;
+        } else if (current->getChild()) {
+          setCurrent(current->getChild());
+          findFirst(current);
           redraw = true;
         }
       } else if (btns.enter == 2) {
@@ -331,6 +345,11 @@ class MenuDisplay {
       return(!current->isEqual(root));
     }
 
+    void resetMenu(void) {
+      isEditing = false;
+      setCurrent(root);
+    }
+
   private:
     void findFirst(MenuItem *newcur) {
       if (newcur) {
@@ -351,6 +370,7 @@ class MenuDisplay {
       display.clearDisplay();
       display.setTextSize(1);
       display.setCursor(0, 0);
+      display.invertDisplay(0);
 
       MenuItem *cur = first;
 
@@ -457,6 +477,7 @@ void handleSensorStatus(uint8_t sindex, DataPacket &status);
 bool handleSyncRequest(DataPacket &req);
 bool acknowledgeSensor(Sensor &sen);
 bool desyncronizeSensor(SensorUid &sid);
+void redrawStatusDisplay(void);
 
 /*
  * Setup / Initialize
@@ -480,7 +501,7 @@ void setup(void) {
   analogWrite(GPIO_SPRAY_PUMP, 0);
 
   // Setup Servo
-  sprayServo.attach(GPIO_SPRAY_SERVO);
+  sprayServo.attach(GPIO_SPRAY_SERVO, SERVO_MIN_LEN, SERVO_MAX_LEN);
   sprayServo.write(90);
   sprayPos = 90;
 
@@ -530,8 +551,18 @@ void loop(void) {
     // TODO Check Water Level Status
 
     // Update Status Display
+    redrawStatus = true;
+    if (displayInvertTimer > DISPLAY_INVERT) {
+      displayInvert = !displayInvert;
+      displayInvertTimer = 0;
+    }
+    displayInvertTimer++;
 
     statusTimer = 0;
+  }
+
+  if (!menuActive && redrawStatus) {
+    redrawStatusDisplay();
   }
 }
 
@@ -596,6 +627,7 @@ void checkMenuDisplay(void) {
   if (menuActive && (menuTimer > MENU_TIMEOUT)) {
     menuActive = false;
     menuTimer = 0;
+    menu.resetMenu();
     return;
   }
 
@@ -776,10 +808,13 @@ bool desyncronizeSensor(SensorUid &sid) {
 void handleSensorData(uint8_t sindex, DataPacket &status) {
   if (sensors[sindex].baseId) {
     sensors[sindex].lastSeen = 0;
+    if (sensors[sindex].activated < 999) {
+      sensors[sindex].activated++;
+    }
     sensors[sindex].vbat = status.batlevel;
 
     // TODO Debounce / Queue Triggers
-    if (sprayNeeded == -1) {
+    if (sensors[sindex].active && (sprayNeeded == -1)) {
       sprayNeeded = sindex;
     }
 
@@ -981,6 +1016,68 @@ void handleRadioPacket(void) {
 }
 
 /*
+ * Redraw the status / rest screen.
+ */
+void redrawStatusDisplay(void) {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+
+  // Show Sensor Status Indicator
+  uint8_t pos = 0;
+  for (int i = 0; i < SENSOR_MAX; i++) {
+    if (sensors[i].baseId) {
+      // Draw sensor activated count / battery status icon
+      char activated[4];
+      if (!sensors[i].active || !masterActive) {
+        activated[0] = 'X';
+        activated[1] = 0;
+      } else if (sensors[i].lastSeen > 60) {
+        activated[0] = '?';
+        activated[1] = 0;
+      } else {
+        snprintf(activated, 4, "%d", sensors[i].activated);
+      }
+
+      char direction[4];
+      snprintf(direction, 4, "%d", sensors[i].direction);
+
+      display.setCursor(5 + (25 * pos) + ((3 - strlen(activated)) * 3), 2);
+      display.print(activated);
+      display.drawRoundRect(9 + (25 * pos), 11, 10, 5, 3, WHITE);
+      display.drawRoundRect(3 + (25 * pos), 14, 22, 38, 5, WHITE);
+      display.fillRect(10 + (25 * pos), 15, 8, 2, BLACK);
+      display.setCursor(5 + (25 * pos) + ((3 - strlen(direction)) * 3), 55);
+      display.print(direction);
+      pos++;
+    }
+
+    if (!pos) {
+      display.setTextSize(2);
+      display.setCursor(2, 10);
+      display.println("   No");
+      display.println(" Sensors");
+    }
+  }
+
+  // Show Water Level Indicator
+  display.drawRoundRect(110, 20, 24, 50, 2, WHITE);
+
+  // Show Master Active Flag
+  display.setTextSize(1);
+  if (masterActive) {
+    display.setCursor(115, 6);
+    display.print("On");
+  } else {
+    display.setCursor(105, 6);
+    display.print("Off");
+  }
+
+  display.invertDisplay(displayInvert);
+  display.display();
+}
+
+/*
  * Setup Display / Show Splash Screen
  */
 void setupDisplay(void) {
@@ -993,15 +1090,15 @@ void setupDisplay(void) {
   display.clearDisplay();
   display.setTextSize(2);
   display.setTextColor(WHITE);
-  display.setCursor(0,0);
-  display.println("Cat");
-  display.println("Trainer");
+  display.setCursor(0, 0);
+  display.println("    Cat");
+  display.println("  Trainer");
   display.println("");
   display.setTextSize(1);
-  display.println("v0.1");
+  display.println("         v0.1");
   display.display();
 
-  delay(2000);
+  delay(3000);
 }
 
 /*
