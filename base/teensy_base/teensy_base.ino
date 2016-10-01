@@ -609,7 +609,7 @@ void checkButtons(void) {
 #if DEBUG
   if (btnState.pushed) {
     printf_P(
-      PSTR("Button state read E: %d U: %d D: %d\r\n"),
+      PSTR("checkButtons: Button state read E: %d U: %d D: %d\r\n"),
       btnState.enter,
       btnState.up,
       btnState.down
@@ -708,7 +708,7 @@ void checkStartSpray(void) {
 
 #if DEBUG
       printf_P(
-        PSTR("Activating spray towards sensor %s (%d).\r\n"),
+        PSTR("checkStartSpray: Activating spray towards sensor %s (%d).\r\n"),
         sens.id.stype,
         sens.id.uid
       );
@@ -721,7 +721,7 @@ void checkStartSpray(void) {
 
 #if DEBUG
       printf_P(
-        PSTR("Moving servo towards sensor %s (%d): %d.\r\n"),
+        PSTR("checkStartSpray: Moving servo towards sensor %s (%d): %d.\r\n"),
         sens.id.stype,
         sens.id.uid,
         sens.direction
@@ -750,14 +750,14 @@ bool acknowledgeSensor(Sensor &sen) {
 #if DEBUG
   if (sent) {
     printf_P(
-      PSTR("Sent Acknowledge to %s (%d) on pipe %02X.\r\n"),
+      PSTR("acknowledgeSensor: Sent Acknowledge to %s (%d) on pipe %02X.\r\n"),
       sen.id.stype,
       sen.id.uid,
       sen.baseId
     );
   } else {
     printf_P(
-      PSTR("Failed to send Acknowledge to %s (%d) on pipe %02X.\r\n"),
+      PSTR("acknowledgeSensor: Failed to send Acknowledge to %s (%d) on pipe %02X.\r\n"),
       sen.id.stype,
       sen.id.uid,
       sen.baseId
@@ -785,13 +785,13 @@ bool desyncronizeSensor(SensorUid &sid) {
 #if DEBUG
   if (sent) {
     printf_P(
-      PSTR("Sent Desyncronize request to %s (%d).\r\n"),
+      PSTR("desyncronizeSensor: Sent Desyncronize request to %s (%d).\r\n"),
       sid.stype,
       sid.uid
     );
   } else {
     printf_P(
-      PSTR("Failed to send Desyncronize request to %s (%d).\r\n"),
+      PSTR("desyncronizeSensor: Failed to send Desyncronize request to %s (%d).\r\n"),
       sid.stype,
       sid.uid
     );
@@ -820,7 +820,7 @@ void handleSensorData(uint8_t sindex, DataPacket &status) {
 
 #if DEBUG
     printf_P(
-      PSTR("Handle sensor trigger %s (%d): %d.\r\n"),
+      PSTR("handleSensorData: Handle sensor trigger %s (%d): %d.\r\n"),
       sensors[sindex].id.stype,
       sensors[sindex].id.uid,
       sensors[sindex].vbat
@@ -840,7 +840,7 @@ void handleSensorStatus(uint8_t sindex, DataPacket &status) {
 
 #if DEBUG
     printf_P(
-      PSTR("Updated sensor status %s (%d): %d.\r\n"),
+      PSTR("handleSensorStatus: Updated sensor status %s (%d): %d.\r\n"),
       sensors[sindex].id.stype,
       sensors[sindex].id.uid,
       sensors[sindex].vbat
@@ -877,7 +877,7 @@ bool handleSyncRequest(DataPacket &req) {
 
 #if DEBUG
     printf_P(
-      PSTR("Found existing record %d for %s (%d): %02X.\r\n"),
+      PSTR("handleSyncRequest: Found existing record %d for %s (%d): %02X.\r\n"),
       sindex,
       sensors[sindex].id.stype,
       sensors[sindex].id.uid,
@@ -896,7 +896,7 @@ bool handleSyncRequest(DataPacket &req) {
 
 #if DEBUG
     printf_P(
-      PSTR("Stored new record %d for %s (%d): %02X.\r\n"),
+      PSTR("handleSyncRequest: Stored new record %d for %s (%d): %02X.\r\n"),
       freeindex,
       sensors[freeindex].id.stype,
       sensors[freeindex].id.uid,
@@ -909,7 +909,7 @@ bool handleSyncRequest(DataPacket &req) {
 
 #if DEBUG
     printf_P(
-      PSTR("Unable to store record for %s (%d).\r\n"),
+      PSTR("handleSyncRequest: Unable to store record for %s (%d).\r\n"),
       req.id.stype,
       req.id.uid
     );
@@ -931,14 +931,14 @@ bool handleSyncRequest(DataPacket &req) {
 #if DEBUG
   if (sent) {
     printf_P(
-      PSTR("Sent Syncronize response to %s (%d): %02X.\r\n"),
+      PSTR("handleSyncRequest: Sent Syncronize response to %s (%d): %02X.\r\n"),
       sendPacket.id.stype,
       sendPacket.id.uid,
       sendPacket.spipe
     );
   } else {
     printf_P(
-      PSTR("Failed to send Syncronize response to %s (%d).\r\n"),
+      PSTR("handleSyncRequest: Failed to send Syncronize response to %s (%d).\r\n"),
       sendPacket.id.stype,
       sendPacket.id.uid
     );
@@ -962,7 +962,7 @@ void handleRadioPacket(void) {
 
     if (!recvPacket.ptype || !recvPacket.id.uid) {
 #if DEBUG
-      DEBUGOUT.println(F("Invalid Packet Received."));
+      DEBUGOUT.println(F("handleRadioPacket: Invalid Packet Received."));
 #endif
       return;
     }
@@ -997,7 +997,7 @@ void handleRadioPacket(void) {
         // Unable to find sensor or id mismatch, desync.
 #if DEBUG
         printf_P(
-          PSTR("Unable to find stored sensor %s (%d).\r\n"),
+          PSTR("handleRadioPacket: Unable to find stored sensor %s (%d).\r\n"),
           recvPacket.id.stype,
           recvPacket.id.uid
         );
@@ -1083,7 +1083,7 @@ void redrawStatusDisplay(void) {
 void setupDisplay(void) {
 
 #if DEBUG
-  DEBUGOUT.println(F("Initializing Display."));
+  DEBUGOUT.println(F("setupDisplay: Initializing Display."));
 #endif
 
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
@@ -1107,7 +1107,7 @@ void setupDisplay(void) {
 void setupMenu(void) {
 
 #if DEBUG
-  DEBUGOUT.println(F("Initializing Menu:"));
+  DEBUGOUT.println(F("setupMenu: Initializing Menu."));
 #endif
 
   // Hide sensor items that aren't synced
@@ -1284,12 +1284,13 @@ void setupMenu(void) {
 void setupRadio(void) {
 
 #if DEBUG
-  DEBUGOUT.println(F("Initializing NRF24L01+:"));
+  DEBUGOUT.println(F("setupRadio: Initializing NRF24L01+:"));
 #endif
 
   radio.begin();
 
-  radio.enableDynamicPayloads();
+  // radio.enableDynamicPayloads();
+  radio.setPayloadSize(sizeof(DataPacket));
   radio.setAutoAck(1);
 
   radio.setDataRate(RF24_1MBPS);
