@@ -26,6 +26,7 @@
 #define MENU_TIMEOUT 10000 // ms until menu exits
 #define SENSOR_MAX 4 // No more than 4 on NRF24L01
 #define DISPLAY_INVERT 30 // Seconds between status display invert
+#define DISPLAY_DIM 30 // Seconds until display dim
 #define DEBUG true
 #define DEBUGOUT Serial
 
@@ -99,6 +100,9 @@ uint8_t sprayMoving = 0;
 
 bool displayInvert = false;
 uint8_t displayInvertTimer = 0;
+
+bool displayDim = false;
+uint8_t displayDimTimer = 0;
 
 elapsedMillis sprayTimer;
 elapsedMillis statusTimer;
@@ -368,6 +372,7 @@ class MenuDisplay {
 
       Adafruit_SSD1306 display = *oled;
       display.clearDisplay();
+      display.dim(false);
       display.setTextSize(1);
       display.setCursor(0, 0);
       display.invertDisplay(0);
@@ -558,6 +563,13 @@ void loop(void) {
     }
     displayInvertTimer++;
 
+    if (displayDimTimer > DISPLAY_DIM) {
+      displayDim = true;
+    } else {
+      displayDim = false;
+      displayDimTimer++;
+    }
+
     statusTimer = 0;
   }
 
@@ -638,6 +650,8 @@ void checkMenuDisplay(void) {
   }
 
   if (menuActive && btnState.pushed) {
+    displayDim = false;
+    displayDimTimer = 0;
     menuActive = menu.handleButtons(btnState);
 
 #if DEBUG
@@ -808,13 +822,14 @@ bool desyncronizeSensor(SensorUid &sid) {
 void handleSensorData(uint8_t sindex, DataPacket &status) {
   if (sensors[sindex].baseId) {
     sensors[sindex].lastSeen = 0;
-    if (sensors[sindex].activated < 999) {
-      sensors[sindex].activated++;
-    }
     sensors[sindex].vbat = status.batlevel;
 
     // TODO Debounce / Queue Triggers
     if (sensors[sindex].active && (sprayNeeded == -1)) {
+      if (sensors[sindex].activated < 999) {
+        sensors[sindex].activated++;
+      }
+
       sprayNeeded = sindex;
     }
 
@@ -1020,6 +1035,7 @@ void handleRadioPacket(void) {
  */
 void redrawStatusDisplay(void) {
   display.clearDisplay();
+  display.dim(displayDim);
   display.setTextSize(1);
   display.setTextColor(WHITE);
 
@@ -1042,11 +1058,30 @@ void redrawStatusDisplay(void) {
       char direction[4];
       snprintf(direction, 4, "%d", sensors[i].direction);
 
+      // Print sensor activated count (top)
       display.setCursor(5 + (25 * pos) + ((3 - strlen(activated)) * 3), 2);
       display.print(activated);
-      display.drawRoundRect(9 + (25 * pos), 11, 10, 5, 3, WHITE);
-      display.drawRoundRect(3 + (25 * pos), 14, 22, 38, 5, WHITE);
+
+      // Draw battery icon
+      uint8_t batIconHeight = 38;
+      display.drawRoundRect(9 + (25 * pos), 11, 10, 5, 2, WHITE);
+      display.drawRoundRect(3 + (25 * pos), 14, 22, batIconHeight, 3, WHITE);
       display.fillRect(10 + (25 * pos), 15, 8, 2, BLACK);
+
+      // Fill battery icon relative to bat level
+      // LiIon bat: vbat 42 = 100%, vbat 32 = 0%
+      float batp = (sensors[i].vbat - 32) / 10.0;
+      int batLevelHeight = (int) (batIconHeight * batp);
+      display.fillRoundRect(
+        3 + (25 * pos),
+        14 + (batIconHeight - batLevelHeight),
+        22,
+        batLevelHeight,
+        3,
+        WHITE
+      );
+
+      // Print sensor servo direction (bottom)
       display.setCursor(5 + (25 * pos) + ((3 - strlen(direction)) * 3), 55);
       display.print(direction);
       pos++;
@@ -1144,6 +1179,10 @@ void setupMenu(void) {
 
   // Add sensor edit items dynamically as sensor menu children
   std::function<MenuItem* (MenuItem &item)> sensChildCb = [] (MenuItem &item) {
+    mi_sensor_active.setParent(item);
+    mi_sensor_dir.setParent(item);
+    mi_sensor_vbat.setParent(item);
+    mi_sensor_lastseen.setParent(item);
     return(&mi_sensor_active);
   };
 
