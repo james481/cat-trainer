@@ -1,0 +1,9 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP LD1117V33
+D 800mA Low-Dropout Linear Regulator, adjustable output
+K linear regulator ldo adjustable positive
+F http://www.ti.com/lit/ds/symlink/lm1117.pdf
+$ENDCMP
+#
+#End Doc Library
