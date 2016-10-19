@@ -212,7 +212,7 @@ F 3 "" H 10000 3800 50  0000 L CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L R R4
+L R R2
 U 1 1 58041CA0
 P 9650 3800
 F 0 "R2" V 9730 3800 50  0000 C CNN
@@ -257,7 +257,7 @@ F 3 "" H 10100 1900 50  0000 C CNN
 $EndComp
 Text GLabel 5250 2150 0    60   UnSpc ~ 0
 NC
-Text GLabel 5250 2300 0    60   UnSpc ~ 0
+Text GLabel 7250 2450 2    60   UnSpc ~ 0
 NC
 Text GLabel 5250 2450 0    60   UnSpc ~ 0
 NC
@@ -452,7 +452,7 @@ F 3 "" H 2650 4050 50  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L R R3
+L R R1
 U 1 1 5803DA18
 P 2650 3900
 F 0 "R1" V 2730 3900 50  0000 C CNN
@@ -559,9 +559,9 @@ Wire Wire Line
 Wire Wire Line
 	5500 4800 5450 4800
 Wire Wire Line
-	5450 4800 5450 4700
+	5450 4700 5450 4800
 Wire Wire Line
-	5450 4700 4750 4700
+	4750 4700 5450 4700
 Connection ~ 5250 4700
 Wire Wire Line
 	5000 5000 5450 5000
@@ -601,10 +601,6 @@ Wire Wire Line
 Wire Wire Line
 	3950 2100 3050 2100
 Wire Wire Line
-	7250 2450 8800 2450
-Wire Wire Line
-	8800 2450 8800 1650
-Wire Wire Line
 	8800 1650 10550 1650
 Wire Wire Line
 	7250 2750 7650 2750
@@ -635,4 +631,12 @@ Wire Wire Line
 	1500 2250 1600 2250
 Wire Wire Line
 	1500 2450 1600 2450
+Wire Wire Line
+	5250 2300 4900 2300
+Wire Wire Line
+	4900 2300 4900 900 
+Wire Wire Line
+	4900 900  8800 900 
+Wire Wire Line
+	8800 900  8800 1650
 $EndSCHEMATC
