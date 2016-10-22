@@ -657,9 +657,9 @@ F 3 "" H 850 3950 50  0000 C CNN
 	1    850  3950
 	-1   0    0    1   
 $EndComp
-Text GLabel 1300 3100 1    60   Input ~ 0
-+5V
 Text GLabel 1300 3250 2    60   Input ~ 0
++5V
+Text GLabel 1300 3100 1    60   Input ~ 0
 +3.3V
 $Comp
 L GND #PWR012
