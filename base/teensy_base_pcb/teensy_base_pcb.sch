@@ -263,8 +263,6 @@ Text GLabel 5250 2450 0    60   UnSpc ~ 0
 NC
 Text GLabel 5250 2600 0    60   UnSpc ~ 0
 NC
-Text GLabel 5250 3200 0    60   UnSpc ~ 0
-NC
 Text GLabel 7250 1700 2    60   UnSpc ~ 0
 NC
 Text GLabel 7250 1850 2    60   UnSpc ~ 0
@@ -274,8 +272,6 @@ NC
 Text GLabel 7250 2300 2    60   UnSpc ~ 0
 NC
 Text GLabel 7250 3050 2    60   UnSpc ~ 0
-NC
-Text GLabel 7250 3200 2    60   UnSpc ~ 0
 NC
 Text GLabel 7250 3350 2    60   UnSpc ~ 0
 NC
@@ -559,9 +555,9 @@ Wire Wire Line
 Wire Wire Line
 	5500 4800 5450 4800
 Wire Wire Line
-	5450 4700 5450 4800
+	5450 4800 5450 4700
 Wire Wire Line
-	4750 4700 5450 4700
+	5450 4700 4750 4700
 Connection ~ 5250 4700
 Wire Wire Line
 	5000 5000 5450 5000
@@ -639,4 +635,67 @@ Wire Wire Line
 	4900 900  8800 900 
 Wire Wire Line
 	8800 900  8800 1650
+$Comp
+L CONN_01X03 P_ACC1
+U 1 1 580AC98D
+P 850 3250
+F 0 "P_ACC1" H 850 3450 50  0000 R CNN
+F 1 "CONN_01X03" V 950 3250 50  0000 C CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x03" H 850 3250 50  0001 C CNN
+F 3 "" H 850 3250 50  0000 C CNN
+	1    850  3250
+	-1   0    0    1   
+$EndComp
+$Comp
+L CONN_01X02 P_ACC2
+U 1 1 580ACB04
+P 850 3950
+F 0 "P_ACC2" H 850 4100 50  0000 R BNN
+F 1 "CONN_01X02" V 950 3950 50  0000 C CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x02" H 850 3950 50  0001 C CNN
+F 3 "" H 850 3950 50  0000 C CNN
+	1    850  3950
+	-1   0    0    1   
+$EndComp
+Text GLabel 1300 3100 1    60   Input ~ 0
++5V
+Text GLabel 1300 3250 2    60   Input ~ 0
++3.3V
+$Comp
+L GND #PWR012
+U 1 1 580ACE3F
+P 1300 3450
+F 0 "#PWR012" H 1300 3200 50  0001 C CNN
+F 1 "GND" H 1300 3300 50  0000 C CNN
+F 2 "" H 1300 3450 50  0000 C CNN
+F 3 "" H 1300 3450 50  0000 C CNN
+	1    1300 3450
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	1050 3150 1300 3150
+Wire Wire Line
+	1300 3150 1300 3100
+Wire Wire Line
+	1050 3250 1300 3250
+Wire Wire Line
+	1050 3350 1300 3350
+Wire Wire Line
+	1300 3350 1300 3450
+Text GLabel 1300 3850 2    60   BiDi ~ 0
+ACC1
+Text GLabel 1300 4050 2    60   BiDi ~ 0
+ACC2
+Text GLabel 5250 3200 0    60   BiDi ~ 0
+ACC1
+Text GLabel 7250 3200 2    60   BiDi ~ 0
+ACC2
+Wire Wire Line
+	1300 4050 1050 4050
+Wire Wire Line
+	1050 4050 1050 4000
+Wire Wire Line
+	1300 3850 1050 3850
+Wire Wire Line
+	1050 3850 1050 3900
 $EndSCHEMATC
