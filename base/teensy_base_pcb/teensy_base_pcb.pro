@@ -1,4 +1,4 @@
-update=Sunday, October 16, 2016 'PMt' 05:18:08 PM
+update=Friday, October 28, 2016 'PMt' 04:00:08 PM
 version=1
 last_client=kicad
 [pcbnew]
@@ -61,3 +61,4 @@ LibName29=valves
 LibName30=lib/teensy_3.1
 LibName31=lib/nRF24L01+
 LibName32=lib/ld1117v33
+LibName33=lib/TA8428K

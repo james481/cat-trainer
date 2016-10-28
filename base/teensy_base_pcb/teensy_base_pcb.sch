@@ -31,6 +31,7 @@ LIBS:valves
 LIBS:teensy_3.1
 LIBS:nRF24L01+
 LIBS:ld1117v33
+LIBS:TA8428K
 LIBS:teensy_base_pcb-cache
 EELAYER 25 0
 EELAYER END
@@ -85,31 +86,9 @@ U 1 1 5803C175
 P 1650 6250
 F 0 "C2" H 1675 6350 50  0000 L CNN
 F 1 "100nF" H 1675 6150 50  0000 L CNN
-F 2 "Capacitors_ThroughHole:C_Rect_L4_W2.5_P2.5" H 1688 6100 50  0001 C CNN
+F 2 "Capacitors_ThroughHole:C_Rect_L7_W2.5_P5" H 1688 6100 50  0001 C CNN
 F 3 "" H 1650 6250 50  0000 C CNN
 	1    1650 6250
-	1    0    0    -1  
-$EndComp
-$Comp
-L C C1
-U 1 1 5803C1BB
-P 1650 5200
-F 0 "C1" H 1675 5300 50  0000 L CNN
-F 1 "330nF" H 1675 5100 50  0000 L CNN
-F 2 "Capacitors_ThroughHole:C_Rect_L4_W2.5_P2.5" H 1688 5050 50  0001 C CNN
-F 3 "" H 1650 5200 50  0000 C CNN
-	1    1650 5200
-	1    0    0    -1  
-$EndComp
-$Comp
-L C C4
-U 1 1 5803C210
-P 3350 6250
-F 0 "C4" H 3375 6350 50  0000 L CNN
-F 1 "10uF" H 3375 6150 50  0000 L CNN
-F 2 "Capacitors_ThroughHole:C_Rect_L4_W2.5_P2.5" H 3388 6100 50  0001 C CNN
-F 3 "" H 3350 6250 50  0000 C CNN
-	1    3350 6250
 	1    0    0    -1  
 $EndComp
 $Comp
@@ -118,7 +97,7 @@ U 1 1 5803C24C
 P 3350 5200
 F 0 "C3" H 3375 5300 50  0000 L CNN
 F 1 "100nF" H 3375 5100 50  0000 L CNN
-F 2 "Capacitors_ThroughHole:C_Rect_L4_W2.5_P2.5" H 3388 5050 50  0001 C CNN
+F 2 "Capacitors_ThroughHole:C_Rect_L7_W2.5_P5" H 3388 5050 50  0001 C CNN
 F 3 "" H 3350 5200 50  0000 C CNN
 	1    3350 5200
 	1    0    0    -1  
@@ -201,39 +180,6 @@ F 3 "" H 10750 3550 50  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L PN2222A Q1
-U 1 1 58041C1C
-P 10000 3800
-F 0 "Q1" H 10200 3875 50  0000 L CNN
-F 1 "PN2222A" H 10200 3800 50  0000 L CNN
-F 2 "TO_SOT_Packages_THT:TO-92_Inline_Narrow_Oval" H 10200 3725 50  0001 L CIN
-F 3 "" H 10000 3800 50  0000 L CNN
-	1    10000 3800
-	1    0    0    -1  
-$EndComp
-$Comp
-L R R2
-U 1 1 58041CA0
-P 9650 3800
-F 0 "R2" V 9730 3800 50  0000 C CNN
-F 1 "270" V 9650 3800 50  0000 C CNN
-F 2 "Resistors_ThroughHole:Resistor_Horizontal_RM10mm" V 9580 3800 50  0001 C CNN
-F 3 "" H 9650 3800 50  0000 C CNN
-	1    9650 3800
-	0    1    1    0   
-$EndComp
-$Comp
-L D D1
-U 1 1 58041DF8
-P 10300 3300
-F 0 "D1" H 10300 3400 50  0000 C CNN
-F 1 "1N4004" H 10300 3200 50  0000 C CNN
-F 2 "Diodes_ThroughHole:Diode_DO-41_SOD81_Horizontal_RM10" H 10300 3300 50  0001 C CNN
-F 3 "" H 10300 3300 50  0000 C CNN
-	1    10300 3300
-	-1   0    0    1   
-$EndComp
-$Comp
 L CONN_01X03 P_SERVO1
 U 1 1 580427F1
 P 10750 1750
@@ -250,14 +196,12 @@ U 1 1 58042B68
 P 10100 1900
 F 0 "C5" H 10125 2000 50  0000 L CNN
 F 1 "470uF" H 10125 1800 50  0000 L CNN
-F 2 "Capacitors_ThroughHole:C_Radial_D10_L20_P5" H 10100 1900 50  0001 C CNN
+F 2 "Capacitors_ThroughHole:C_Radial_D8_L13_P3.8" H 10100 1900 50  0001 C CNN
 F 3 "" H 10100 1900 50  0000 C CNN
 	1    10100 1900
 	1    0    0    -1  
 $EndComp
 Text GLabel 5250 2150 0    60   UnSpc ~ 0
-NC
-Text GLabel 7250 2450 2    60   UnSpc ~ 0
 NC
 Text GLabel 5250 2450 0    60   UnSpc ~ 0
 NC
@@ -364,13 +308,13 @@ $EndComp
 $Comp
 L GND #PWR06
 U 1 1 5804FE02
-P 10100 4000
-F 0 "#PWR06" H 10100 3750 50  0001 C CNN
-F 1 "GND" H 10100 3850 50  0000 C CNN
-F 2 "" H 10100 4000 50  0000 C CNN
-F 3 "" H 10100 4000 50  0000 C CNN
-	1    10100 4000
-	1    0    0    -1  
+P 8700 3600
+F 0 "#PWR06" H 8700 3350 50  0001 C CNN
+F 1 "GND" H 8700 3450 50  0000 C CNN
+F 2 "" H 8700 3600 50  0000 C CNN
+F 3 "" H 8700 3600 50  0000 C CNN
+	1    8700 3600
+	0    1    1    0   
 $EndComp
 $Comp
 L GND #PWR07
@@ -419,7 +363,7 @@ Text GLabel 9600 1750 0    60   Input ~ 0
 +5V
 Text GLabel 1600 2250 2    60   Output ~ 0
 +9V
-Text GLabel 10100 3050 0    60   Input ~ 0
+Text GLabel 8700 3900 0    60   Input ~ 0
 +9V
 Text GLabel 5000 5000 0    60   Input ~ 0
 +3.3V
@@ -429,7 +373,7 @@ U 1 1 5805414E
 P 5250 4850
 F 0 "C6" H 5275 4950 50  0000 L CNN
 F 1 "100uF" H 5275 4750 50  0000 L CNN
-F 2 "Capacitors_ThroughHole:C_Radial_D5_L11_P2" H 5250 4850 50  0001 C CNN
+F 2 "Capacitors_ThroughHole:C_Radial_D5_L11_P2.5" H 5250 4850 50  0001 C CNN
 F 3 "" H 5250 4850 50  0000 C CNN
 	1    5250 4850
 	-1   0    0    1   
@@ -500,18 +444,11 @@ Wire Wire Line
 	1050 6100 2200 6100
 Connection ~ 1650 6100
 Wire Wire Line
-	2800 6100 3550 6100
-Connection ~ 3350 6100
-Wire Wire Line
 	1050 6400 3350 6400
 Connection ~ 2500 6400
 Connection ~ 1650 6400
 Wire Wire Line
-	1050 5050 2100 5050
-Connection ~ 1650 5050
-Wire Wire Line
 	1050 5350 3350 5350
-Connection ~ 1650 5350
 Connection ~ 2500 5350
 Wire Wire Line
 	3050 1900 3350 1900
@@ -519,13 +456,7 @@ Wire Wire Line
 	2900 5050 3550 5050
 Connection ~ 3350 5050
 Wire Wire Line
-	10100 3600 10550 3600
-Wire Wire Line
 	7250 2600 8050 2600
-Wire Wire Line
-	8050 2600 8050 3800
-Wire Wire Line
-	8050 3800 9500 3800
 Wire Wire Line
 	10550 2050 10550 1850
 Wire Wire Line
@@ -536,18 +467,7 @@ Wire Wire Line
 Connection ~ 10100 1750
 Connection ~ 1500 2450
 Wire Wire Line
-	10150 3300 10100 3300
-Wire Wire Line
-	10100 3300 10100 3600
-Wire Wire Line
 	10550 5000 10100 5000
-Wire Wire Line
-	10550 3050 10100 3050
-Wire Wire Line
-	10550 3050 10550 3500
-Wire Wire Line
-	10450 3300 10550 3300
-Connection ~ 10550 3300
 Wire Wire Line
 	5500 5100 4600 5100
 Wire Wire Line
@@ -698,4 +618,75 @@ Wire Wire Line
 	1300 3850 1050 3850
 Wire Wire Line
 	1050 3850 1050 3900
+$Comp
+L TA8428K U5
+U 1 1 5813AE6C
+P 10050 3550
+F 0 "U5" H 10050 3300 60  0000 C CNN
+F 1 "TA8428K" H 10050 3800 60  0000 C CNN
+F 2 "Socket_Strips:Socket_Strip_Straight_1x07" H 10050 3550 60  0001 C CNN
+F 3 "" H 10050 3550 60  0001 C CNN
+	1    10050 3550
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	8050 2600 8050 3500
+Wire Wire Line
+	8050 3500 9550 3500
+Wire Wire Line
+	7250 2450 8150 2450
+Wire Wire Line
+	8150 2450 8150 3400
+Wire Wire Line
+	8150 3400 9550 3400
+Wire Wire Line
+	9350 3900 9350 3700
+Wire Wire Line
+	9350 3700 9550 3700
+$Comp
+L CP1 C7
+U 1 1 5813E1FE
+P 8900 3750
+F 0 "C7" H 8925 3850 50  0000 L CNN
+F 1 "10uF" H 8600 3750 50  0000 L CNN
+F 2 "Capacitors_ThroughHole:C_Radial_D5_L11_P2.5" H 8900 3750 50  0001 C CNN
+F 3 "" H 8900 3750 50  0000 C CNN
+	1    8900 3750
+	-1   0    0    1   
+$EndComp
+Wire Wire Line
+	8700 3600 9550 3600
+Connection ~ 8900 3600
+Wire Wire Line
+	8700 3900 9350 3900
+Connection ~ 8900 3900
+$Comp
+L CP1 C4
+U 1 1 5813F531
+P 3350 6250
+F 0 "C4" H 3375 6350 50  0000 L CNN
+F 1 "10uF" H 3400 6150 50  0000 L CNN
+F 2 "Capacitors_ThroughHole:C_Radial_D5_L11_P2.5" H 3350 6250 50  0001 C CNN
+F 3 "" H 3350 6250 50  0000 C CNN
+	1    3350 6250
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	2800 6100 3550 6100
+Connection ~ 3350 6100
+$Comp
+L CP1 C1
+U 1 1 5813FD2B
+P 1650 5200
+F 0 "C1" H 1675 5300 50  0000 L CNN
+F 1 "330nF" H 1700 5100 50  0000 L CNN
+F 2 "Capacitors_ThroughHole:C_Rect_L7_W2.5_P5" H 1650 5200 50  0001 C CNN
+F 3 "" H 1650 5200 50  0000 C CNN
+	1    1650 5200
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	1050 5050 2100 5050
+Connection ~ 1650 5050
+Connection ~ 1650 5350
 $EndSCHEMATC
