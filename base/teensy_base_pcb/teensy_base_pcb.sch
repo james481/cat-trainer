@@ -174,7 +174,7 @@ U 1 1 58041805
 P 10750 3550
 F 0 "P_PUMP1" H 10750 3700 50  0000 C BNN
 F 1 "CONN_01X02" V 10850 3550 50  0000 R CNN
-F 2 "Terminal_Blocks:TerminalBlock_Pheonix_MPT-2.54mm_2pol" H 10750 3550 50  0001 C CNN
+F 2 "Terminal_Blocks:TerminalBlock_Pheonix_PT-3.5mm_2pol" H 10750 3550 50  0001 C CNN
 F 3 "" H 10750 3550 50  0000 C CNN
 	1    10750 3550
 	1    0    0    -1  
@@ -630,15 +630,7 @@ F 3 "" H 10050 3550 60  0001 C CNN
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
-	8050 2600 8050 3500
-Wire Wire Line
-	8050 3500 9550 3500
-Wire Wire Line
 	7250 2450 8150 2450
-Wire Wire Line
-	8150 2450 8150 3400
-Wire Wire Line
-	8150 3400 9550 3400
 Wire Wire Line
 	9350 3900 9350 3700
 Wire Wire Line
@@ -649,7 +641,7 @@ U 1 1 5813E1FE
 P 8900 3750
 F 0 "C7" H 8925 3850 50  0000 L CNN
 F 1 "10uF" H 8600 3750 50  0000 L CNN
-F 2 "Capacitors_ThroughHole:C_Radial_D5_L11_P2.5" H 8900 3750 50  0001 C CNN
+F 2 "Capacitors_ThroughHole:C_Rect_L7_W2.5_P5" H 8900 3750 50  0001 C CNN
 F 3 "" H 8900 3750 50  0000 C CNN
 	1    8900 3750
 	-1   0    0    1   
@@ -666,7 +658,7 @@ U 1 1 5813F531
 P 3350 6250
 F 0 "C4" H 3375 6350 50  0000 L CNN
 F 1 "10uF" H 3400 6150 50  0000 L CNN
-F 2 "Capacitors_ThroughHole:C_Radial_D5_L11_P2.5" H 3350 6250 50  0001 C CNN
+F 2 "Capacitors_ThroughHole:C_Rect_L7_W2.5_P5" H 3350 6250 50  0001 C CNN
 F 3 "" H 3350 6250 50  0000 C CNN
 	1    3350 6250
 	1    0    0    -1  
@@ -689,4 +681,12 @@ Wire Wire Line
 	1050 5050 2100 5050
 Connection ~ 1650 5050
 Connection ~ 1650 5350
+Wire Wire Line
+	8150 2450 8150 3500
+Wire Wire Line
+	8150 3500 9550 3500
+Wire Wire Line
+	8050 2600 8050 3400
+Wire Wire Line
+	8050 3400 9550 3400
 $EndSCHEMATC
