@@ -363,7 +363,7 @@ Text GLabel 9600 1750 0    60   Input ~ 0
 +5V
 Text GLabel 1600 2250 2    60   Output ~ 0
 +9V
-Text GLabel 8700 3900 0    60   Input ~ 0
+Text GLabel 8400 3900 0    60   Input ~ 0
 +9V
 Text GLabel 5000 5000 0    60   Input ~ 0
 +3.3V
@@ -689,4 +689,17 @@ Wire Wire Line
 	8050 2600 8050 3400
 Wire Wire Line
 	8050 3400 9550 3400
+$Comp
+L F_Small F1
+U 1 1 5814D4C0
+P 8600 3900
+F 0 "F1" H 8560 3960 50  0000 L CNN
+F 1 "F_Small" H 8480 3840 50  0000 L CNN
+F 2 "Fuse_Holders_and_Fuses:Fuse_TE5_Littlefuse-395Series" H 8600 3900 50  0001 C CNN
+F 3 "" H 8600 3900 50  0000 C CNN
+	1    8600 3900
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	8500 3900 8400 3900
 $EndSCHEMATC
