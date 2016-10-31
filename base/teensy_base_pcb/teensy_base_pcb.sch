@@ -38,9 +38,9 @@ EELAYER END
 $Descr A4 11693 8268
 encoding utf-8
 Sheet 1 1
-Title ""
+Title "Teensy Base PCB"
 Date ""
-Rev ""
+Rev "1a"
 Comp ""
 Comment1 ""
 Comment2 ""
@@ -396,7 +396,7 @@ L R R1
 U 1 1 5803DA18
 P 2650 3900
 F 0 "R1" V 2730 3900 50  0000 C CNN
-F 1 "10K" V 2650 3900 50  0000 C CNN
+F 1 "100" V 2650 3900 50  0000 C CNN
 F 2 "Resistors_ThroughHole:Resistor_Horizontal_RM10mm" V 2580 3900 50  0001 C CNN
 F 3 "" H 2650 3900 50  0000 C CNN
 	1    2650 3900

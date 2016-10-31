@@ -3,7 +3,7 @@
   (general
     (links 67)
     (no_connects 9)
-    (area 94.687429 69.131 192.305715 135.415001)
+    (area 102.794999 69.774999 172.795001 121.995001)
     (thickness 1.6)
     (drawings 28)
     (tracks 121)
@@ -13,6 +13,11 @@
   )
 
   (page A4)
+  (title_block
+    (title "Teensy Base PCB")
+    (rev 1a)
+  )
+
   (layers
     (0 F.Cu signal)
     (31 B.Cu signal)
@@ -802,7 +807,7 @@
     (fp_text reference R1 (at 5.334 0) (layer F.SilkS)
       (effects (font (size 1 1) (thickness 0.15)))
     )
-    (fp_text value 10K (at 5.08 -2.413) (layer F.Fab)
+    (fp_text value 100 (at 5.08 -2.413) (layer F.Fab)
       (effects (font (size 1 1) (thickness 0.15)))
     )
     (fp_line (start -1.25 -1.5) (end 11.4 -1.5) (layer F.CrtYd) (width 0.05))
@@ -1307,10 +1312,10 @@
   (gr_text GND (at 150.495 103.505 90) (layer B.SilkS)
     (effects (font (size 0.635 0.635) (thickness 0.127)) (justify mirror))
   )
-  (gr_text "Cat Trainer\nrev. 1a" (at 148.082 90.932 90) (layer B.SilkS)
+  (gr_text "Cat Trainer\nrev. 1a" (at 147.955 91.44 90) (layer B.SilkS)
     (effects (font (size 2 2) (thickness 0.3)) (justify mirror))
   )
-  (gr_text "Cat Trainer\nrev. 1a" (at 148.082 90.932 90) (layer F.SilkS)
+  (gr_text "Cat Trainer\nrev. 1a" (at 147.955 91.44 90) (layer F.SilkS)
     (effects (font (size 2 2) (thickness 0.3)))
   )
   (gr_line (start 137.922 79.502) (end 126.238 79.502) (angle 90) (layer F.SilkS) (width 0.2))
