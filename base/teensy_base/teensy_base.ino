@@ -45,7 +45,8 @@
 #define SERVO_MOVE_DELAY 500
 #define PUMP_SPRAY_LENGTH 1000
 #define GPIO_SPRAY_PUMP A6
-#define GPIO_SPRAY_SERVO A7
+#define GPIO_SPRAY_PUMP2 A7
+#define GPIO_SPRAY_SERVO 3
 #define SERVO_MIN_LEN 1050
 #define SERVO_MAX_LEN 2050
 
@@ -497,13 +498,15 @@ void setup(void) {
 #endif
 
   // Setup Buttons
-  pinMode(GPIO_BTN_ENTER, INPUT);
-  pinMode(GPIO_BTN_DN, INPUT);
-  pinMode(GPIO_BTN_UP, INPUT);
+  pinMode(GPIO_BTN_ENTER, INPUT_PULLUP);
+  pinMode(GPIO_BTN_DN, INPUT_PULLUP);
+  pinMode(GPIO_BTN_UP, INPUT_PULLUP);
 
   // Setup Spray Pump
   pinMode(GPIO_SPRAY_PUMP, OUTPUT);
   analogWrite(GPIO_SPRAY_PUMP, 0);
+  pinMode(GPIO_SPRAY_PUMP2, OUTPUT);
+  analogWrite(GPIO_SPRAY_PUMP2, 0);
 
   // Setup Servo
   sprayServo.attach(GPIO_SPRAY_SERVO, SERVO_MIN_LEN, SERVO_MAX_LEN);
@@ -590,9 +593,9 @@ void checkButtons(void) {
 
   // Check if enter button pressed
   buttonEnter.update();
-  if (buttonEnter.risingEdge()) {
+  if (buttonEnter.fallingEdge()) {
     menuTimer = 0;
-  } else if (buttonEnter.fallingEdge()) {
+  } else if (buttonEnter.risingEdge()) {
     btnState.pushed = true;
     btnState.enter = (menuTimer > GPIO_BTN_HOLD_DELAY) ? 2 : 1;
   }
@@ -600,9 +603,9 @@ void checkButtons(void) {
   // Check if direction buttons pressed (if menu is active)
   if (!btnState.pushed && menuActive) {
     buttonUp.update();
-    if (buttonUp.risingEdge()) {
+    if (buttonUp.fallingEdge()) {
       menuTimer = 0;
-    } else if (buttonUp.fallingEdge()) {
+    } else if (buttonUp.risingEdge()) {
       btnState.pushed = true;
       btnState.up = (menuTimer > GPIO_BTN_HOLD_DELAY) ? 2 : 1;
     }
@@ -610,9 +613,9 @@ void checkButtons(void) {
 
   if (!btnState.pushed && menuActive) {
     buttonDown.update();
-    if (buttonDown.risingEdge()) {
+    if (buttonDown.fallingEdge()) {
       menuTimer = 0;
-    } else if (buttonDown.fallingEdge()) {
+    } else if (buttonDown.risingEdge()) {
       btnState.pushed = true;
       btnState.down = (menuTimer > GPIO_BTN_HOLD_DELAY) ? 2 : 1;
     }
@@ -673,7 +676,7 @@ void checkMenuDisplay(void) {
 void checkSprayServoTimeout(void) {
   // Check Spray timeout status
   if ((sprayActive != -1) && (sprayTimer > PUMP_SPRAY_LENGTH)) {
-    analogWrite(GPIO_SPRAY_PUMP, 0);
+    analogWrite(GPIO_SPRAY_PUMP2, 0);
     sprayActive = -1;
     sprayTimer = 0;
   }
@@ -718,7 +721,7 @@ void checkStartSpray(void) {
       // Activate Spray
       sprayActive = sprayNeeded;
       sprayNeeded = -1;
-      analogWrite(GPIO_SPRAY_PUMP, 255);
+      analogWrite(GPIO_SPRAY_PUMP2, 255);
 
 #if DEBUG
       printf_P(
