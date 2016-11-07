@@ -2,3 +2,4 @@
 .rpt*
 *.kicad_pcb-bak
 *.bak
+*.FCStd1
