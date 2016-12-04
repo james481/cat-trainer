@@ -1,0 +1,4 @@
+(fp_lib_table
+  (lib (name AdafruitFeather)(type KiCad)(uri "$(KIPRJMOD)/lib/AdafruitFeather.pretty")(options "")(descr ""))
+  (lib (name Switches)(type KiCad)(uri "$(KIPRJMOD)/lib/Switches.pretty")(options "")(descr ""))
+)
