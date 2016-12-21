@@ -20,6 +20,7 @@
  * Configuration
  */
 #define DEBUG false
+#define DEBUGOUT Serial
 #define FEATHER32U4 true
 #define BAT_VCC_HIGH 40
 #define BAT_VCC_MED 35
@@ -46,11 +47,11 @@
 // Feather 32u4 (Production):
 #define GPIO_RF24_CE 5
 #define GPIO_RF24_CSN 6
-#define GPIO_MMA_IRQ1 2
-#define GPIO_MMA_IRQ2 3
+#define GPIO_MMA_IRQ1 3
+#define GPIO_MMA_IRQ2 2
 #define GPIO_LED_R 10
-#define GPIO_LED_G 11
-#define GPIO_LED_B 12
+#define GPIO_LED_G 12
+#define GPIO_LED_B 11
 #define FEATHER32U4_BATTERY_PIN A9
 
 #endif
@@ -112,10 +113,11 @@ DataPacket sendPacket, recPacket;
  */
 void setup(void) {
 #if DEBUG
-  Serial.begin(115200);
+  DEBUGOUT.begin(9600);
+  while (!DEBUGOUT) { ; }
   printf_begin();
-  Serial.println(F(""));
-  delay(3000);
+  DEBUGOUT.println(F(""));
+  delay(1000);
 #endif
 
   setupUid();
@@ -152,7 +154,7 @@ void setup(void) {
   sei();
 
 #if DEBUG
-  Serial.println(F("Sensor Ready."));
+  DEBUGOUT.println(F("Sensor Ready."));
   delay(250);
 #endif
 }
@@ -210,7 +212,7 @@ void loop(void) {
  */
 void enableStatusLed(void) {
 #if DEBUG
-  Serial.println(F("enableStatusLed: Enabling."));
+  DEBUGOUT.println(F("enableStatusLed: Enabling."));
 #endif
 
 #ifdef FEATHER32U4
@@ -284,17 +286,16 @@ uint8_t getBatteryVoltage(void) {
 void setupRadio(void) {
 
 #if DEBUG
-  Serial.println(F("setupRadio: Initializing NRF24L01+:"));
+  DEBUGOUT.println(F("setupRadio: Initializing NRF24L01+:"));
 #endif
 
   radio.begin();
 
   radio.setPayloadSize(sizeof(DataPacket));
-  // radio.enableDynamicPayloads();
   radio.setAutoAck(1);
 
   radio.setDataRate(RF24_1MBPS);
-  radio.setPALevel(RF24_PA_LOW);
+  radio.setPALevel(RF24_PA_HIGH);
   radio.setChannel(RADIO_CHANNEL);
   radio.setCRCLength(RF24_CRC_16);
   radio.setRetries(15,15);
@@ -316,7 +317,7 @@ void setupRadio(void) {
  */
 void setupSensor(void) {
 #if DEBUG
-  Serial.println(F("setupSensor: Initializing MMA8452."));
+  DEBUGOUT.println(F("setupSensor: Initializing MMA8452."));
 #endif
   // TODO Multiple sensor setup
   uint8_t address = ADDR;
@@ -327,7 +328,7 @@ void setupSensor(void) {
   if (who_am_i != 0x2A) {
 
 #if DEBUG
-    Serial.println(F("setupSensor: Unable to connect to MMA8452."));
+    DEBUGOUT.println(F("setupSensor: Unable to connect to MMA8452."));
 #endif
     return;
   }
@@ -405,7 +406,7 @@ void sendSensorStatus(void) {
   sendPacket.batlevel = getBatteryVoltage();
 
 #if DEBUG
-  Serial.println(F("sendSensorStatus: Sending."));
+  DEBUGOUT.println(F("sendSensorStatus: Sending."));
 #endif
 
   radio.powerUp();
@@ -413,7 +414,7 @@ void sendSensorStatus(void) {
   if (!radio.write(&sendPacket, sizeof(sendPacket))) {
 
 #if DEBUG
-    Serial.println(F("sendSensorStatus: Send failed."));
+    DEBUGOUT.println(F("sendSensorStatus: Send failed."));
 #endif
 
   }
@@ -434,7 +435,7 @@ void sendSensorStatus(void) {
   if (timeout) {
 
 #if DEBUG
-    Serial.println(F("sendSensorStatus: Radio timeout."));
+    DEBUGOUT.println(F("sendSensorStatus: Radio timeout."));
 #endif
 
   } else {
@@ -445,21 +446,21 @@ void sendSensorStatus(void) {
       if ((pipeNum == 2) && (recPacket.ptype == PTYPE_OK)) {
 
 #if DEBUG
-        Serial.println(F("sendSensorStatus: Radio Status Acknowledged."));
+        DEBUGOUT.println(F("sendSensorStatus: Radio Status Acknowledged."));
 #endif
 
       } else if ((pipeNum == 1) && (recPacket.ptype == PTYPE_DESYNC) && (myUid.isEqual(recPacket.id))) {
         sensorId = 0;
 
 #if DEBUG
-        Serial.println(F("sendSensorStatus: Radio Status Desync Requested."));
+        DEBUGOUT.println(F("sendSensorStatus: Radio Status Desync Requested."));
 #endif
 
       }
     } else {
 
 #if DEBUG
-      Serial.println(F("sendSensorStatus: Invalid DataPacket."));
+      DEBUGOUT.println(F("sendSensorStatus: Invalid DataPacket."));
 #endif
 
     }
@@ -485,7 +486,7 @@ void sendSensorTrigger(void) {
   sendPacket.batlevel = getBatteryVoltage();
 
 #if DEBUG
-  Serial.println(F("sendSensorTrigger: Sending."));
+  DEBUGOUT.println(F("sendSensorTrigger: Sending."));
 #endif
 
   setLedColor(255, 0, 0);
@@ -497,7 +498,7 @@ void sendSensorTrigger(void) {
     setLedColor(255, 255, 66);
 
 #if DEBUG
-    Serial.println(F("sendSensorTrigger: Send failed."));
+    DEBUGOUT.println(F("sendSensorTrigger: Send failed."));
 #endif
 
   }
@@ -520,7 +521,7 @@ void sendSensorTrigger(void) {
     setLedColor(255, 255, 66);
 
 #if DEBUG
-    Serial.println(F("sendSensorTrigger: Radio timeout."));
+    DEBUGOUT.println(F("sendSensorTrigger: Radio timeout."));
 #endif
 
   } else {
@@ -531,21 +532,21 @@ void sendSensorTrigger(void) {
       if ((pipeNum == 2) && (recPacket.ptype == PTYPE_OK)) {
 
 #if DEBUG
-        Serial.println(F("sendSensorTrigger: Radio trigger acknowledged."));
+        DEBUGOUT.println(F("sendSensorTrigger: Radio trigger acknowledged."));
 #endif
 
       } else if ((pipeNum == 1) && (recPacket.ptype == PTYPE_DESYNC) && (myUid.isEqual(recPacket.id))) {
         sensorId = 0;
 
 #if DEBUG
-        Serial.println(F("sendSensorTrigger: Radio trigger desync requested."));
+        DEBUGOUT.println(F("sendSensorTrigger: Radio trigger desync requested."));
 #endif
 
       }
     } else {
 
 #if DEBUG
-      Serial.println(F("sendSensorTrigger: Invalid DataPacket."));
+      DEBUGOUT.println(F("sendSensorTrigger: Invalid DataPacket."));
 #endif
 
     }
@@ -591,7 +592,7 @@ void syncSensor(void) {
   sendPacket.batlevel = getBatteryVoltage();
 
 #if DEBUG
-  Serial.println(F("syncSensor: Syncing sensor ID."));
+  DEBUGOUT.println(F("syncSensor: Syncing sensor ID."));
 #endif
 
   setLedColor(0, 0, 255);
@@ -604,7 +605,7 @@ void syncSensor(void) {
     setLedColor(255, 0, 0);
 
 #if DEBUG
-    Serial.println(F("syncSensor: Send failed."));
+    DEBUGOUT.println(F("syncSensor: Send failed."));
 #endif
 
   }
@@ -628,7 +629,7 @@ void syncSensor(void) {
     setLedColor(255, 0, 0);
 
 #if DEBUG
-    Serial.println(F("syncSensor: Radio Timeout."));
+    DEBUGOUT.println(F("syncSensor: Radio Timeout."));
 #endif
 
   } else {
@@ -640,14 +641,14 @@ void syncSensor(void) {
         sensorId = recPacket.spipe;
 
 #if DEBUG
-        Serial.println(F("syncSensor: Sync complete."));
+        DEBUGOUT.println(F("syncSensor: Sync complete."));
 #endif
 
       }
     } else {
 
 #if DEBUG
-      Serial.println(F("syncSensor: Invalid DataPacket."));
+      DEBUGOUT.println(F("syncSensor: Invalid DataPacket."));
 #endif
 
     }
@@ -670,7 +671,7 @@ void syncSensor(void) {
  */
 void setupUid(void) {
 #if DEBUG
-  Serial.print(F("setupUid: Setting debug sensor UID "));
+  DEBUGOUT.print(F("setupUid: Setting debug sensor UID "));
   myUid.uid = 255;
   strncpy(myUid.stype, "MMA8452DBG", sizeof(myUid.stype));
   printf_P(PSTR("%d Type: %s\r\n"), myUid.uid, myUid.stype);

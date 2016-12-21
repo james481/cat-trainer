@@ -27,6 +27,8 @@
 #define SENSOR_MAX 4 // No more than 4 on NRF24L01
 #define DISPLAY_INVERT 30 // Seconds between status display invert
 #define DISPLAY_DIM 30 // Seconds until display dim
+#define WATER_LEVEL_SENSOR false
+#define EEPROM_SENSORS_ADDR 0
 #define DEBUG true
 #define DEBUGOUT Serial
 
@@ -38,12 +40,12 @@
 #define GPIO_BTN_ENTER 6
 #define GPIO_BTN_DN 7
 #define GPIO_BTN_UP 8
-#define GPIO_DEBOUNCE 10
+#define GPIO_BTN_DEBOUNCE 10
 #define GPIO_BTN_HOLD_DELAY 500
 
 // Pump / Servo
-#define SERVO_MOVE_DELAY 500
-#define PUMP_SPRAY_LENGTH 1000
+#define SERVO_MOVE_DELAY 500 // ms for servo to repoint nozzle
+#define PUMP_SPRAY_LENGTH 500 // ms for spray pump active
 #define GPIO_SPRAY_PUMP A6
 #define GPIO_SPRAY_PUMP2 A7
 #define GPIO_SPRAY_SERVO 3
@@ -66,9 +68,9 @@ Adafruit_SSD1306 display(GPIO_OLED_RESET);
 Servo sprayServo;
 
 // Buttons
-Bounce buttonEnter(GPIO_BTN_ENTER, GPIO_DEBOUNCE);
-Bounce buttonDown(GPIO_BTN_DN, GPIO_DEBOUNCE);
-Bounce buttonUp(GPIO_BTN_UP, GPIO_DEBOUNCE);
+Bounce buttonEnter(GPIO_BTN_ENTER, GPIO_BTN_DEBOUNCE);
+Bounce buttonDown(GPIO_BTN_DN, GPIO_BTN_DEBOUNCE);
+Bounce buttonUp(GPIO_BTN_UP, GPIO_BTN_DEBOUNCE);
 
 // Button States: 0 - None, 1 - Click, 2 - Hold
 struct ButtonState {
@@ -451,8 +453,12 @@ MenuItem mi_sensor_active("Active:", 20);
 MenuItem mi_sensor_dir("Direction:", 21);
 MenuItem mi_sensor_vbat("Battery:", 22);
 MenuItem mi_sensor_lastseen("Last Seen:", 23);
+MenuItem mi_sensor_forget("Remove:", 24);
 
 MenuItem mi_master("Master Active:", 100);
+MenuItem mi_sensors_save("Save Setup:", 101);
+MenuItem mi_confirm_n("Cancel", 110);
+MenuItem mi_confirm_y("Confirm", 111);
 
 MenuDisplay menu(&display, &mi_root);
 
@@ -466,7 +472,6 @@ namespace std
   {
   }
 }
-
 
 void setup(void);
 void loop(void);
@@ -484,6 +489,8 @@ bool handleSyncRequest(DataPacket &req);
 bool acknowledgeSensor(Sensor &sen);
 bool desyncronizeSensor(SensorUid &sid);
 void redrawStatusDisplay(void);
+void saveSensorSetup(void);
+void loadSensorSetup(void);
 
 /*
  * Setup / Initialize
@@ -515,6 +522,9 @@ void setup(void) {
 
   setupRadio();
   setupMenu();
+
+  // Load Saved Sensors From EEPROM
+  loadSensorSetup();
 
 #if DEBUG
   DEBUGOUT.println(F("Base Ready."));
@@ -557,6 +567,8 @@ void loop(void) {
     }
 
     // TODO Check Water Level Status
+#if WATER_LEVEL_SENSOR
+#endif
 
     // Update Status Display
     redrawStatus = true;
@@ -828,7 +840,7 @@ void handleSensorData(uint8_t sindex, DataPacket &status) {
     sensors[sindex].vbat = status.batlevel;
 
     // TODO Debounce / Queue Triggers
-    if (sensors[sindex].active && (sprayNeeded == -1)) {
+    if (masterActive && sensors[sindex].active && (sprayNeeded == -1)) {
       if (sensors[sindex].activated < 999) {
         sensors[sindex].activated++;
       }
@@ -1046,6 +1058,7 @@ void redrawStatusDisplay(void) {
   uint8_t pos = 0;
   for (int i = 0; i < SENSOR_MAX; i++) {
     if (sensors[i].baseId) {
+
       // Draw sensor activated count / battery status icon
       char activated[4];
       if (!sensors[i].active || !masterActive) {
@@ -1073,7 +1086,10 @@ void redrawStatusDisplay(void) {
 
       // Fill battery icon relative to bat level
       // LiIon bat: vbat 42 = 100%, vbat 32 = 0%
-      float batp = (sensors[i].vbat - 32) / 10.0;
+      uint8_t vbat = sensors[i].vbat;
+      vbat = (vbat > 42) ? 42 : vbat;
+      vbat = (vbat < 32) ? 32 : vbat;
+      float batp = (vbat - 32) / 10.0;
       int batLevelHeight = (int) (batIconHeight * batp);
       display.fillRoundRect(
         3 + (25 * pos),
@@ -1098,8 +1114,10 @@ void redrawStatusDisplay(void) {
     }
   }
 
+#if WATER_LEVEL_SENSOR
   // Show Water Level Indicator
   display.drawRoundRect(110, 20, 24, 50, 2, WHITE);
+#endif
 
   // Show Master Active Flag
   display.setTextSize(1);
@@ -1318,6 +1336,9 @@ void setupMenu(void) {
     });
 
   mi_sensors.addBelow(mi_master);
+
+  // Save Current Sensors
+
 }
 
 /*
@@ -1331,12 +1352,11 @@ void setupRadio(void) {
 
   radio.begin();
 
-  // radio.enableDynamicPayloads();
   radio.setPayloadSize(sizeof(DataPacket));
   radio.setAutoAck(1);
 
   radio.setDataRate(RF24_1MBPS);
-  radio.setPALevel(RF24_PA_LOW);
+  radio.setPALevel(RF24_PA_HIGH);
   radio.setChannel(RADIO_CHANNEL);
   radio.setCRCLength(RF24_CRC_16);
   radio.setRetries(15,15);
@@ -1355,6 +1375,65 @@ void setupRadio(void) {
   radio.printDetails();
   delay(1000);
 #endif
+}
+
+/*
+ * Save Current Sensors Config to EEPROM.
+ */
+void saveSensorSetup(void) {
+  Sensor store[SENSOR_MAX];
+
+  uint8_t storei = 0;
+  for (int i = 0; i < SENSOR_MAX; i++) {
+    if (sensors[i].baseId) {
+      store[storei].copyFrom(sensors[i]);
+      storei++;
+    }
+  }
+
+  if (storei > 0) {
+
+#if DEBUG
+    printf_P(
+      PSTR("saveSensorSetup: Saving %d sensor records.\r\n"),
+      storei
+    );
+#endif
+
+    EEPROM.put(EEPROM_SENSORS_ADDR, store);
+  } else {
+
+#if DEBUG
+  DEBUGOUT.println(F("saveSensorSetup: No sensor records found."));
+#endif
+
+  }
+}
+
+/*
+ * Load Saved Sensors Config from EEPROM.
+ */
+void loadSensorSetup(void) {
+  Sensor load[SENSOR_MAX];
+
+  uint8_t loadi = 0;
+
+  EEPROM.get(EEPROM_SENSORS_ADDR, load);
+
+  for (int i = 0; i < SENSOR_MAX; i++) {
+    if (load[i].baseId && load[i].id.uid) {
+      sensors[loadi].copyFrom(load[i]);
+      loadi++;
+    }
+  }
+
+#if DEBUG
+    printf_P(
+      PSTR("loadSensorSetup: Loaded %d sensor records.\r\n"),
+      loadi
+    );
+#endif
+
 }
 
 // vim:cin:ai:sts=2 sw=2 ft=cpp

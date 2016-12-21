@@ -8,21 +8,19 @@
 #include <SPI.h>
 #include "RF24.h"
 #include "printf.h"
+#include "ct_sensor.h"
 
 /*
  * Configuration
  */
 #define EEPROM_ADDR 0
-#define SENSOR_NAME "AFMMA8452"
-#define SENSOR_ID 1
+#define SENSOR_NAME "AF8452PCB"
+#define SENSOR_ID 2
 
 /*
  * ID Storage (EEPROM)
  */
-struct sensorUid {
-  char stype[11];
-  uint8_t uid;
-} myUid;
+SensorUid myUid;
 
 /*
  * Setup / Initialize

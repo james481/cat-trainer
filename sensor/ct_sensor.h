@@ -55,6 +55,14 @@ class Sensor {
     bool isEqual(Sensor &comp) {
       return(id.isEqual(comp.id));
     }
+
+    void copyFrom(Sensor &source) {
+      id.copyFrom(source.id);
+      baseId = source.baseId;
+      direction = source.direction;
+      active = source.active;
+      activated = source.activated;
+    }
 };
 
 /*
