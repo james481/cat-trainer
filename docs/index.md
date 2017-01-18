@@ -42,7 +42,7 @@ The final implemented sensor nodes use a [Feather / Atmel 32u4 board](https://ww
 
 ![Sensor Hand Built][sensor_hand]
 
-I decided after building the first one that a [PCB](../sensor/feather32u4_mma8452_pcb) would be much easier than wiring everything by hand, and makes everything look a bit cleaner to boot (although this PCB design has a couple of minor fit issues I'd like to fix).
+I decided after building the first one that a [PCB](https://oshpark.com/shared_projects/1HsJuNbs) would be much easier than wiring everything by hand, and makes everything look a bit cleaner to boot (although this PCB design has a couple of minor fit issues I'd like to fix).
 
 ![Sensor PCB][sensor_pcb]
 
@@ -83,7 +83,7 @@ The connected sensor nodes are displayed as icons indicating their current batte
 
 #### PCB
 
-A custom [PCB](../base/teensy_base_pcb) designed in [KiCad](http://kicad-pcb.org/) provides a home for all the electronics and connections to the pump and servo, and has a barrel connector suitable for a typical 9V / 2A DC converter for power. In addition to the Teensy microcontroller and Nordic radio chip, an H-bridge motor driver IC is used to control the pump (running at 9V), and a pair of voltage regulators provide the 5V and 3.3V supplies to run the servo motor, Teensy, display, and radio.
+A custom [PCB](https://oshpark.com/shared_projects/nA5DhVjQ) designed in [KiCad](http://kicad-pcb.org/) provides a home for all the electronics and connections to the pump and servo, and has a barrel connector suitable for a typical 9V / 2A DC converter for power. In addition to the Teensy microcontroller and Nordic radio chip, an H-bridge motor driver IC is used to control the pump (running at 9V), and a pair of voltage regulators provide the 5V and 3.3V supplies to run the servo motor, Teensy, display, and radio.
 
 ![Base Station PCB][base_pcb]
 
@@ -123,12 +123,12 @@ That said, be prepared for some troubleshooting, editing of code, or making adap
 
 All of the parts can be sourced from either Amazon or Digikey (among other places), some of which are linked to above. The PCBs that I used to build this can be ordered from OSHPark (or you can modify them from the source files to suit your needs):
 
-* [Base Software](../base/teensy_base)
+* [Base Software]({{ site.github.repository_url }}/blob/master/base/teensy_base/teensy_base.ino)
 * [Base PCB - OSHPark](https://oshpark.com/shared_projects/nA5DhVjQ)
-* [Base KiCad Schematic / PCB](../base/teensy_base_pcb)
-* [Sensor Software](../sensor/arduino_mma8452)
+* [Base KiCad Schematic / PCB]({{ site.github.repository_url }}/tree/master/base/teensy_base_pcb)
+* [Sensor Software]({{ site.github.repository_url }}/blob/master/sensor/arduino_mma8452/arduino_mma8452.ino)
 * [Sensor PCB - OSHPark](https://oshpark.com/shared_projects/1HsJuNbs)
-* [Sensor KiCad Schematic / PCB](../sensor/feather32u4_mma8452_pcb)
+* [Sensor KiCad Schematic / PCB]({{ site.github.repository_url }}/tree/master/base/teensy_base_pcb)
 
 Happy hacking!
 
