@@ -4,6 +4,11 @@
  * Behavior correction base station utilizing DC pump sprayhead and
  * communicating via NRF24L01+ to remote sensor nodes on an Teensy 3.x
  * compatible host.
+ *
+ * Copyright (c) 2016 - 2017, James Watts
+ * All rights reserved, no unauthorized distribution or reproduction.
+ *
+ * See LICENSE.txt for details.
  */
 
 #include <functional>

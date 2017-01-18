@@ -2,6 +2,11 @@
  * arduino_write_uid.ino
  *
  * Write Arduino-based sensor EEPROM storage with unique sensor ID.
+ *
+ * Copyright (c) 2016 - 2017, James Watts
+ * All rights reserved, no unauthorized distribution or reproduction.
+ *
+ * See LICENSE.txt for details.
  */
 
 #include <EEPROM.h>

@@ -3,6 +3,11 @@
  *
  * Remote behavior detection node using MMA8452 accelerometer and NRF24L01+ on
  * an Arduino compatible host.
+ *
+ * Copyright (c) 2016 - 2017, James Watts
+ * All rights reserved, no unauthorized distribution or reproduction.
+ *
+ * See LICENSE.txt for details.
  */
 
 #include <avr/sleep.h>

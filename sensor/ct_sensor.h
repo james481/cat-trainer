@@ -2,6 +2,11 @@
  * ct_sensor.h
  *
  * Common definitions for trainer sensor communications.
+ *
+ * Copyright (c) 2016 - 2017, James Watts
+ * All rights reserved, no unauthorized distribution or reproduction.
+ *
+ * See LICENSE.txt for details.
  */
 
 /*
