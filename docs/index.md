@@ -132,6 +132,10 @@ All of the parts can be sourced from either Amazon or Digikey (among other place
 
 Happy hacking!
 
+## Updates
+
+High resolution / additional images are available via [Imgur](http://imgur.com/a/s6DJq).
+
 [torn_carpet]: ./img/carpet.png
 [main]: ./img/main_realistic.png
 [angry_cat]: ./img/angry_cat.png
