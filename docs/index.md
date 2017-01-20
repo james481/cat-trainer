@@ -2,6 +2,8 @@
 title: Electronic Feline Warfare for Fun and Profit
 ---
 
+__This project has been featured on [Hackaday](http://www.hackaday.com). Welcome HaD readers and thanks for checking it out!__
+
 ## The Problem
 
 My wife and I have a couple of cats in our home, and as any cat owners can tell you they pretty much spend their days either napping or causing problems. One particular problem our cats cause is tearing up the carpets and furniture in our home. This sight is familiar to many cat owners:
@@ -135,6 +137,8 @@ Happy hacking!
 ## Updates
 
 High resolution / additional images are available via [Imgur](http://imgur.com/a/s6DJq).
+
+This project has been featured on [Hackaday](http://hackaday.com/2017/01/20/sentry-robot-turns-bad-cat-to-good/)!
 
 [torn_carpet]: ./img/carpet.png
 [main]: ./img/main_realistic.png
