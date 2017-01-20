@@ -111,7 +111,7 @@ Sweet, sweet success!
 
 ## Next Steps
 
-Along with some additional features and software tuning still to be done, I did a bit of research to see if I could find anything like this already being made or sold. So far I've yet to come up with anything similar, so I've decided to take steps on patenting this technology while evaluating if it has any commercial potential, and currently this device is patent pending. If you're interested in building these for commercial sale, please [contact me](http://www.jamescwatts.com). That said, I would love to see anyone else build their own version to use at home, and would be excited to hear about any improvements you may come up with.
+Along with some additional features and software tuning still to be done, I did a bit of research to see if I could find anything like this already being made or sold. So far I've yet to come up with anything similar, so I've decided to take steps on patenting this technology while evaluating if it has any commercial potential, and currently this device is patent pending. If you're interested in building one these, please [contact me](http://www.jamescwatts.com). That said, I would love to hear from you if you want to build your own version to use at home, and would be excited to hear about any improvements you may come up with.
 
 ---
 
@@ -139,6 +139,8 @@ Happy hacking!
 High resolution / additional images are available via [Imgur](http://imgur.com/a/s6DJq).
 
 This project has been featured on [Hackaday](http://hackaday.com/2017/01/20/sentry-robot-turns-bad-cat-to-good/)!
+
+__Licensing:__ It's come to my attention that US patent law (where the patent for this device is pending) may require licensing if you choose to build one of these devices for personal use. My intention in filing for patent protection for this device is due to the (obviously very remote) possibility that it may have widespread commercial appeal and as an exercise in learning to navigate the patent process and system. I fully encourage and support anyone who would like to build or improve this device for personal, non-commercial use and you can [contact me](http://www.jamescwatts.com) if you would like to arrange a license for doing so.
 
 [torn_carpet]: ./img/carpet.png
 [main]: ./img/main_realistic.png

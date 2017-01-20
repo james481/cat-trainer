@@ -19,6 +19,6 @@ __This project has been featured on [Hackaday](http://hackaday.com/2017/01/20/se
 
 All code and other materials contained in this repository are copyright (c) 2016 - 2017 James Watts or their respective copyright holders as noted, and is provided under BSD license. For details see [LICENSE.txt](LICENSE.txt).
 
-This device is patent pending.
+This device is patent pending. Please [contact me](http://www.jamescwatts.com) for licensing or more information.
 
 [main]: ./docs/img/main_realistic.png
